@@ -3,12 +3,18 @@ import { Simulator } from "./simulator";
 export default function Home() {
   return (
     <>
-      <h1 style={{ fontSize: "1.75rem", marginBottom: "0.25rem" }}>Simulateur de matching EUR ↔ XOF</h1>
-      <p style={{ color: "#555", marginTop: 0 }}>
-        Prototype. Aucun argent n&apos;est déplacé : l&apos;outil calcule seulement comment une demande
-        pourrait être servie par plusieurs offres.
-      </p>
+      <section className="intro">
+        <h1>Simulateur de matching EUR ↔ XOF</h1>
+        <p>
+          Une demande est servie par plusieurs vendeurs, chacun à son propre taux. Les offres
+          partiellement consommées gardent leur reste dans le carnet.
+        </p>
+      </section>
       <Simulator />
+      <p className="disclaimer">
+        Prototype de démonstration. Aucun argent n&apos;est déplacé, aucun paiement n&apos;est
+        effectué. Les vendeurs et les montants affichés sont fictifs.
+      </p>
     </>
   );
 }

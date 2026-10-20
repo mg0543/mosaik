@@ -11,6 +11,7 @@ import {
   type SellEurOffer,
   type SellXofOffer,
   type XofMatchResult,
+  xofForEurCents,
 } from "@/lib/matching";
 
 /** Sens de l'échange vu par le demandeur. */
@@ -33,36 +34,101 @@ const INITIAL_XOF_BOOK: SellXofOffer[] = [
 
 const INITIAL_NEXT_SEQ = INITIAL_EUR_BOOK.length + INITIAL_XOF_BOOK.length + 1;
 
+// ---------- Affichage uniquement (les décimales sont permises ici) ----------
+
 const fmtXof = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} XOF`;
 const fmtEur = (cents: number) =>
-  `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`;
+  `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const fmtRate = (rate: number) => rate.toLocaleString("fr-FR", { maximumFractionDigits: 3 });
+/** Part servie, arrondie à l'inférieur : on n'affiche jamais 100 % s'il reste un montant. */
+function fmtPct(part: number, total: number): string {
+  const pct = Math.floor((part / total) * 1000) / 10;
+  return `${pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+}
 /** Conversion d'une saisie en euros vers des centimes entiers (corrige 1.13 * 100 = 112.999…). */
 const toCents = (eur: number) => Math.round(eur * 100);
+
+/** Montant dans la devise que le demandeur dépense, ou qu'il reçoit. */
+const fmtSpent = (d: Direction, n: number) => (d === "buyEur" ? fmtXof(n) : fmtEur(n));
+const fmtReceived = (d: Direction, n: number) => (d === "buyEur" ? fmtEur(n) : fmtXof(n));
+
+/** Équivalent indicatif d'un montant saisi au taux de référence. */
+function refEquivalent(d: Direction, amount: number): string {
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return d === "buyEur"
+    ? `≈ ${fmtEur(eurCentsForXof(Math.floor(amount), REFERENCE_RATE_XOF_PER_EUR))} au taux de référence`
+    : `≈ ${fmtXof(xofForEurCents(toCents(amount), REFERENCE_RATE_XOF_PER_EUR))} au taux de référence`;
+}
+
+/** Écart d'un taux par rapport à la référence, en pourcentage. */
+function rateGap(rate: number): string {
+  if (!Number.isFinite(rate) || rate <= 0) return "";
+  const pct = (rate / REFERENCE_RATE_XOF_PER_EUR - 1) * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} % par rapport à la référence`;
+}
 
 /** Une offre de XOF dont le reste ne vaut pas 1 centime à son taux n'est plus appariable. */
 const isXofDust = (o: SellXofOffer) => eurCentsForXof(o.xofRemaining, o.maxRateXofPerEur) === 0;
 
-const inputStyle = { padding: 8, fontSize: 16, width: 180 } as const;
-const labelStyle = { display: "flex", flexDirection: "column", gap: 4 } as const;
-const buttonStyle = {
-  padding: "8px 16px",
-  fontSize: 15,
-  background: "#1a1a1a",
-  color: "#fff",
-  border: "none",
-  borderRadius: 4,
-  cursor: "pointer",
-} as const;
-const warningStyle = { color: "#8a5a00" } as const;
+// ---------- Modèle d'affichage commun aux deux sens ----------
+
+interface PreviewView {
+  direction: Direction;
+  fills: Fill[];
+  /** Montants dans la devise dépensée : XOF (achat d'EUR) ou centimes (achat de XOF). */
+  total: number;
+  spent: number;
+  unfilled: number;
+  /** Montant reçu : centimes (achat d'EUR) ou XOF (achat de XOF). */
+  received: number;
+  /** Reste technique en XOF : chez le demandeur (achat d'EUR) ou chez les vendeurs (achat de XOF). */
+  roundingXof: number;
+  /** Identifiants des offres qui disparaissent du carnet si l'on exécute. */
+  consumedIds: Set<string>;
+}
 
 type Preview =
-  | { ok: true; direction: "buyEur"; value: MatchResult }
-  | { ok: true; direction: "buyXof"; value: XofMatchResult }
+  | { ok: true; view: PreviewView; raw: { direction: "buyEur"; value: MatchResult } | { direction: "buyXof"; value: XofMatchResult } }
   | { ok: false; error: string };
 
-type Execution =
-  | { direction: "buyEur"; value: MatchResult }
-  | { direction: "buyXof"; value: XofMatchResult };
+function viewOfBuyEur(result: MatchResult, total: number, book: SellEurOffer[]): PreviewView {
+  const remaining = new Set(result.book.map((o) => o.id));
+  return {
+    direction: "buyEur",
+    fills: result.fills,
+    total,
+    spent: result.xofFilled,
+    unfilled: result.xofUnfilled,
+    received: result.fills.reduce((s, f) => s + f.eurCents, 0),
+    roundingXof: result.xofRoundingRemainder,
+    consumedIds: new Set(book.filter((o) => !remaining.has(o.id)).map((o) => o.id)),
+  };
+}
+
+function viewOfBuyXof(result: XofMatchResult, total: number, book: SellXofOffer[]): PreviewView {
+  const remaining = new Set(result.book.map((o) => o.id));
+  const servedIds = new Set(result.fills.map((f) => f.offerId));
+  return {
+    direction: "buyXof",
+    fills: result.fills,
+    total,
+    spent: result.eurCentsFilled,
+    unfilled: result.eurCentsUnfilled,
+    received: result.xofReceived,
+    roundingXof: result.book
+      .filter((o) => servedIds.has(o.id) && isXofDust(o))
+      .reduce((s, o) => s + o.xofRemaining, 0),
+    consumedIds: new Set(book.filter((o) => !remaining.has(o.id)).map((o) => o.id)),
+  };
+}
+
+interface Execution {
+  direction: Direction;
+  spent: number;
+  received: number;
+  sellers: number;
+}
 
 export function Simulator() {
   const [direction, setDirection] = useState<Direction>("buyEur");
@@ -87,33 +153,28 @@ export function Simulator() {
   const [offerMaxRate, setOfferMaxRate] = useState(652);
   const [offerError, setOfferError] = useState<string | null>(null);
 
-  // Dernière exécution (pour affichage)
   const [lastExecution, setLastExecution] = useState<Execution | null>(null);
 
   const preview = useMemo<Preview>(() => {
     try {
       if (direction === "buyEur") {
-        return {
-          ok: true,
-          direction,
-          value: matchBuyRequest(eurBook, {
-            id: "demande",
-            ownerId: "demandeur",
-            xofToSpend: Math.floor(xof),
-            maxRateXofPerEur: maxRate,
-          }),
-        };
-      }
-      return {
-        ok: true,
-        direction,
-        value: matchBuyXofRequest(xofBook, {
+        const total = Math.floor(xof);
+        const value = matchBuyRequest(eurBook, {
           id: "demande",
           ownerId: "demandeur",
-          eurCentsToSpend: toCents(eur),
-          minRateXofPerEur: minRate,
-        }),
-      };
+          xofToSpend: total,
+          maxRateXofPerEur: maxRate,
+        });
+        return { ok: true, view: viewOfBuyEur(value, total, eurBook), raw: { direction, value } };
+      }
+      const total = toCents(eur);
+      const value = matchBuyXofRequest(xofBook, {
+        id: "demande",
+        ownerId: "demandeur",
+        eurCentsToSpend: total,
+        minRateXofPerEur: minRate,
+      });
+      return { ok: true, view: viewOfBuyXof(value, total, xofBook), raw: { direction, value } };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Erreur inconnue" };
     }
@@ -174,13 +235,15 @@ export function Simulator() {
 
   function executeRequest() {
     if (!preview.ok) return;
-    if (preview.direction === "buyEur") {
-      setEurBook(preview.value.book);
-      setLastExecution({ direction: "buyEur", value: preview.value });
-    } else {
-      setXofBook(preview.value.book);
-      setLastExecution({ direction: "buyXof", value: preview.value });
-    }
+    const { raw, view } = preview;
+    if (raw.direction === "buyEur") setEurBook(raw.value.book);
+    else setXofBook(raw.value.book);
+    setLastExecution({
+      direction: view.direction,
+      spent: view.spent,
+      received: view.received,
+      sellers: view.fills.length,
+    });
   }
 
   function resetBooks() {
@@ -190,232 +253,397 @@ export function Simulator() {
     setLastExecution(null);
   }
 
-  const canExecute = preview.ok && preview.value.fills.length > 0;
-
-  return (
-    <section>
-      {/* Sens de l'échange */}
-      <fieldset style={{ border: "1px solid #ccc", borderRadius: 4, padding: "0.5rem 1rem", marginBottom: "1rem" }}>
-        <legend>Sens de l&apos;échange</legend>
-        <label style={{ marginRight: "1.5rem" }}>
-          <input type="radio" name="direction" checked={direction === "buyEur"}
-            onChange={() => changeDirection("buyEur")} />{" "}
-          J&apos;ai des XOF, je veux des EUR
-        </label>
-        <label>
-          <input type="radio" name="direction" checked={direction === "buyXof"}
-            onChange={() => changeDirection("buyXof")} />{" "}
-          J&apos;ai des EUR, je veux des XOF
-        </label>
-      </fieldset>
-
-      {/* Demande */}
-      <h2 style={{ fontSize: "1.1rem" }}>
-        1. {direction === "buyEur" ? "Demande d'achat d'EUR" : "Demande d'achat de XOF"}
-      </h2>
-      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-        {direction === "buyEur" ? (
-          <>
-            <label style={labelStyle}>
-              Montant à dépenser (XOF)
-              <input type="number" value={xof} min={1} step={1000}
-                onChange={(e) => setXof(Number(e.target.value))} style={inputStyle} />
-            </label>
-            <label style={labelStyle}>
-              Taux maximum (XOF / EUR)
-              <input type="number" value={maxRate} min={1} step={0.5}
-                onChange={(e) => setMaxRate(Number(e.target.value))} style={inputStyle} />
-            </label>
-          </>
-        ) : (
-          <>
-            <label style={labelStyle}>
-              Montant à dépenser (EUR)
-              <input type="number" value={eur} min={0.01} step={10}
-                onChange={(e) => setEur(Number(e.target.value))} style={inputStyle} />
-            </label>
-            <label style={labelStyle}>
-              Taux minimum (XOF / EUR)
-              <input type="number" value={minRate} min={1} step={0.5}
-                onChange={(e) => setMinRate(Number(e.target.value))} style={inputStyle} />
-            </label>
-          </>
-        )}
-        <div style={{ alignSelf: "flex-end", color: "#666", fontSize: 14 }}>
-          Référence : {REFERENCE_RATE_XOF_PER_EUR} XOF / EUR
-        </div>
-      </div>
-
-      {!preview.ok && <p style={{ color: "#b00020" }}>{preview.error}</p>}
-
-      {preview.ok && (
-        <>
-          <h3 style={{ fontSize: "1rem" }}>Exécution proposée</h3>
-          {preview.value.fills.length === 0 ? (
-            <p>Aucune offre acceptable au taux demandé.</p>
-          ) : (
-            <FillsTable fills={preview.value.fills} direction={preview.direction} />
-          )}
-          {preview.direction === "buyEur" ? (
-            <BuyEurSummary result={preview.value} />
-          ) : (
-            <BuyXofSummary result={preview.value} />
-          )}
-          <button type="button" onClick={executeRequest} disabled={!canExecute}
-            style={{ ...buttonStyle, opacity: canExecute ? 1 : 0.4 }}>
-            Exécuter cette demande
-          </button>
-        </>
-      )}
-
-      {/* Nouvelle offre */}
-      <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>
-        2. {direction === "buyEur" ? "Proposer des EUR à la vente" : "Proposer des XOF à la vente"}
-      </h2>
-      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
-        {direction === "buyEur" ? (
-          <>
-            <label style={labelStyle}>
-              Montant d&apos;EUR à vendre
-              <input type="number" value={offerEur} min={1} step={10}
-                onChange={(e) => setOfferEur(Number(e.target.value))} style={inputStyle} />
-            </label>
-            <label style={labelStyle}>
-              Taux minimum accepté (XOF / EUR)
-              <input type="number" value={offerMinRate} min={1} step={0.5}
-                onChange={(e) => setOfferMinRate(Number(e.target.value))} style={inputStyle} />
-            </label>
-          </>
-        ) : (
-          <>
-            <label style={labelStyle}>
-              Montant de XOF à vendre
-              <input type="number" value={offerXof} min={1} step={1000}
-                onChange={(e) => setOfferXof(Number(e.target.value))} style={inputStyle} />
-            </label>
-            <label style={labelStyle}>
-              Taux maximum accepté (XOF / EUR)
-              <input type="number" value={offerMaxRate} min={1} step={0.5}
-                onChange={(e) => setOfferMaxRate(Number(e.target.value))} style={inputStyle} />
-            </label>
-          </>
-        )}
-        <button type="button" onClick={addOffer} style={buttonStyle}>Ajouter l&apos;offre</button>
-      </div>
-      {offerError && <p style={{ color: "#b00020" }}>{offerError}</p>}
-
-      {/* Carnet */}
-      <h2 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>
-        Carnet d&apos;ordres : {direction === "buyEur" ? "vendeurs d'EUR" : "vendeurs de XOF"}
-      </h2>
-      {direction === "buyEur" ? (
-        eurBook.length === 0 ? (
-          <p>Le carnet est vide.</p>
-        ) : (
-          <ul>
-            {eurBook.map((o) => (
-              <li key={o.id}>
-                {o.ownerId} : {fmtEur(o.eurCentsRemaining)} disponibles à partir de {o.minRateXofPerEur} XOF / EUR
-              </li>
-            ))}
-          </ul>
-        )
-      ) : xofBook.length === 0 ? (
-        <p>Le carnet est vide.</p>
-      ) : (
-        <ul>
-          {xofBook.map((o) => (
-            <li key={o.id}>
-              {o.ownerId} : {fmtXof(o.xofRemaining)} disponibles jusqu&apos;à {o.maxRateXofPerEur} XOF / EUR
-              {isXofDust(o) && (
-                <span style={warningStyle}>
-                  {" "}(reste technique : vaut moins d&apos;un centime à ce taux, n&apos;est plus appariable)
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <button type="button" onClick={resetBooks} style={{ ...buttonStyle, background: "#777" }}>
-        Réinitialiser les données de démonstration
-      </button>
-
-      {/* Dernière exécution */}
-      {lastExecution && (
-        <div style={{ marginTop: "2rem", padding: 12, background: "#eef7ee", borderRadius: 4 }}>
-          <strong>Dernière exécution (simulation) :</strong>{" "}
-          {lastExecution.direction === "buyEur"
-            ? `${fmtXof(lastExecution.value.xofFilled)} dépensés contre des EUR`
-            : `${fmtEur(lastExecution.value.eurCentsFilled)} dépensés contre ${fmtXof(lastExecution.value.xofReceived)}`}{" "}
-          à travers {lastExecution.value.fills.length} vendeur(s). Aucun paiement réel n&apos;a été effectué.
-        </div>
-      )}
-    </section>
-  );
-}
-
-function BuyEurSummary({ result }: { result: MatchResult }) {
-  const eurReceived = result.fills.reduce((sum, f) => sum + f.eurCents, 0);
-  return (
-    <>
-      <p>
-        <strong>Servi :</strong> {fmtXof(result.xofFilled)} contre {fmtEur(eurReceived)} &nbsp;·&nbsp;
-        <strong>Non servi :</strong> {fmtXof(result.xofUnfilled)}
-      </p>
-      {result.xofRoundingRemainder > 0 && (
-        <p style={warningStyle}>
-          Dont {fmtXof(result.xofRoundingRemainder)} de reste technique : trop peu pour acheter
-          1 centime d&apos;euro. Ce montant n&apos;est pas dépensé et reste au demandeur.
-        </p>
-      )}
-    </>
-  );
-}
-
-function BuyXofSummary({ result }: { result: XofMatchResult }) {
-  // Restes techniques que cette exécution laisserait chez les vendeurs servis.
-  const servedIds = new Set(result.fills.map((f) => f.offerId));
-  const dustLeft = result.book
-    .filter((o) => servedIds.has(o.id) && isXofDust(o))
-    .reduce((sum, o) => sum + o.xofRemaining, 0);
-  return (
-    <>
-      <p>
-        <strong>Servi :</strong> {fmtEur(result.eurCentsFilled)} contre {fmtXof(result.xofReceived)} &nbsp;·&nbsp;
-        <strong>Non servi :</strong> {fmtEur(result.eurCentsUnfilled)}
-      </p>
-      {dustLeft > 0 && (
-        <p style={warningStyle}>
-          Reste technique : {fmtXof(dustLeft)} resteraient chez les vendeurs servis, car ce montant
-          vaut moins d&apos;un centime d&apos;euro à leur taux.
-        </p>
-      )}
-    </>
-  );
-}
-
-function FillsTable({ fills, direction }: { fills: Fill[]; direction: Direction }) {
   const buyEur = direction === "buyEur";
+
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "1rem" }}>
-      <thead>
-        <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-          <th>Vendeur</th>
-          <th>{buyEur ? "EUR reçus" : "EUR payés"}</th>
-          <th>{buyEur ? "XOF payés" : "XOF reçus"}</th>
-          <th>Taux</th>
-        </tr>
-      </thead>
-      <tbody>
+    <div className="layout">
+      <div className="stack">
+        {/* Demande */}
+        <section className="card" aria-labelledby="request-title">
+          <div className="card-head">
+            <h2 id="request-title">Votre demande</h2>
+          </div>
+          <div className="card-body">
+            <div className="segmented" role="group" aria-label="Sens de l'échange">
+              <button type="button" aria-pressed={buyEur} onClick={() => changeDirection("buyEur")}>
+                <span className="pair">XOF → EUR</span>
+                <span className="hint">J&apos;ai des XOF, je veux des euros</span>
+              </button>
+              <button type="button" aria-pressed={!buyEur} onClick={() => changeDirection("buyXof")}>
+                <span className="pair">EUR → XOF</span>
+                <span className="hint">J&apos;ai des euros, je veux des XOF</span>
+              </button>
+            </div>
+
+            <div className="fields">
+              {buyEur ? (
+                <>
+                  <NumberField label="Montant à dépenser" suffix="XOF" value={xof} step={1000} min={1}
+                    onChange={setXof} hint={refEquivalent("buyEur", xof)} />
+                  <NumberField label="Taux maximum accepté" suffix="XOF / €" value={maxRate} step={0.5} min={1}
+                    onChange={setMaxRate} hint={rateGap(maxRate)} />
+                </>
+              ) : (
+                <>
+                  <NumberField label="Montant à dépenser" suffix="€" value={eur} step={10} min={0.01}
+                    onChange={setEur} hint={refEquivalent("buyXof", eur)} />
+                  <NumberField label="Taux minimum accepté" suffix="XOF / €" value={minRate} step={0.5} min={1}
+                    onChange={setMinRate} hint={rateGap(minRate)} />
+                </>
+              )}
+            </div>
+            {!preview.ok && <p className="error" role="alert">{preview.error}</p>}
+          </div>
+        </section>
+
+        {/* Exécution proposée */}
+        <section className="card" aria-labelledby="result-title">
+          <div className="card-head">
+            <h2 id="result-title">Exécution proposée</h2>
+            {preview.ok && (
+              <span className="meta">
+                {preview.view.fills.length} vendeur{preview.view.fills.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="card-body">
+            {lastExecution && (
+              <div className="notice success" role="status" style={{ marginTop: 0, marginBottom: 16 }}>
+                <IconCheck />
+                <div>
+                  <strong>Simulation exécutée.</strong>{" "}
+                  {fmtSpent(lastExecution.direction, lastExecution.spent)} échangés contre{" "}
+                  {fmtReceived(lastExecution.direction, lastExecution.received)} auprès de{" "}
+                  {lastExecution.sellers} vendeur{lastExecution.sellers > 1 ? "s" : ""}. Le carnet a été
+                  mis à jour. Aucun paiement réel n&apos;a eu lieu.
+                </div>
+              </div>
+            )}
+
+            {preview.ok ? (
+              <ResultView view={preview.view} />
+            ) : (
+              <p className="empty">Corrigez la demande pour voir l&apos;exécution proposée.</p>
+            )}
+
+            <div className="actions">
+              <button type="button" className="btn btn-primary" onClick={executeRequest}
+                disabled={!preview.ok || preview.view.fills.length === 0}>
+                Exécuter la demande
+              </button>
+              <span className="field-hint">Simulation : le carnet est mis à jour, aucun argent ne bouge.</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Carnet d'ordres */}
+      <section className="card" aria-labelledby="book-title">
+        <div className="card-head stacked">
+          <h2 id="book-title">Carnet : {buyEur ? "vendeurs d'euros" : "vendeurs de XOF"}</h2>
+          <span className="meta">
+            Ordre de passage : taux le plus {buyEur ? "bas" : "élevé"}, puis premier arrivé
+          </span>
+        </div>
+        <div className="card-body">
+          <OrderBook
+            direction={direction}
+            eurBook={eurBook}
+            xofBook={xofBook}
+            fills={preview.ok ? preview.view.fills : []}
+            consumedIds={preview.ok ? preview.view.consumedIds : new Set()}
+          />
+        </div>
+        <div className="card-foot">
+          <div className="foot-row">
+            <h3>Ajouter une offre {buyEur ? "de vente d'euros" : "de vente de XOF"}</h3>
+            <button type="button" className="link-btn" onClick={resetBooks}>
+              Réinitialiser la démo
+            </button>
+          </div>
+          <div className="add-offer">
+            {buyEur ? (
+              <>
+                <NumberField label="Montant" suffix="€" value={offerEur} step={10} min={1} onChange={setOfferEur} />
+                <NumberField label="Taux minimum" suffix="XOF / €" value={offerMinRate} step={0.5} min={1}
+                  onChange={setOfferMinRate} />
+              </>
+            ) : (
+              <>
+                <NumberField label="Montant" suffix="XOF" value={offerXof} step={1000} min={1} onChange={setOfferXof} />
+                <NumberField label="Taux maximum" suffix="XOF / €" value={offerMaxRate} step={0.5} min={1}
+                  onChange={setOfferMaxRate} />
+              </>
+            )}
+            <button type="button" className="btn btn-secondary" onClick={addOffer}>Ajouter</button>
+          </div>
+          {offerError && <p className="error" role="alert">{offerError}</p>}
+          <p className="field-hint" style={{ margin: "10px 0 0" }}>
+            {buyEur
+              ? "Le vendeur reçoit au moins ce nombre de XOF par euro vendu."
+              : "Le vendeur donne au plus ce nombre de XOF par euro reçu."}
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ResultView({ view }: { view: PreviewView }) {
+  const { direction, fills, total, spent, unfilled, received, roundingXof } = view;
+  const buyEur = direction === "buyEur";
+
+  if (fills.length === 0) {
+    return (
+      <div className="notice info" style={{ marginTop: 0 }}>
+        <IconInfo />
+        <div>
+          Aucune offre du carnet n&apos;est compatible avec votre taux{" "}
+          {buyEur ? "maximum" : "minimum"}. Ajustez le taux ou ajoutez une offre.
+        </div>
+      </div>
+    );
+  }
+
+  const xofTotal = fills.reduce((s, f) => s + f.xofAmount, 0);
+  const centsTotal = fills.reduce((s, f) => s + f.eurCents, 0);
+  const avgRate = centsTotal > 0 ? xofTotal / (centsTotal / 100) : 0;
+  // Part de chaque vendeur, mesurée dans la devise dépensée par le demandeur.
+  const share = (f: Fill) => (buyEur ? f.xofAmount : f.eurCents);
+  // Le non-servi hors reste technique : vrai manque de liquidité.
+  const shortfall = buyEur ? unfilled - roundingXof : unfilled;
+
+  return (
+    <>
+      <div className="hero">
+        <div className="stat stat-main">
+          <div className="stat-label">Vous recevez</div>
+          <div className="stat-value">{fmtReceived(direction, received)}</div>
+          <div className="stat-sub">pour {fmtSpent(direction, spent)}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Taux moyen obtenu</div>
+          <div className="stat-value">{fmtRate(avgRate)}</div>
+          <div className="stat-sub">XOF / €</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label">Servi</div>
+          <div className="stat-value">{fmtPct(spent, total)}</div>
+          <div className="stat-sub">de la demande</div>
+        </div>
+      </div>
+
+      <div className="alloc" role="img"
+        aria-label={`Répartition : ${fills.length} vendeurs servent ${fmtSpent(direction, spent)} sur ${fmtSpent(direction, total)}`}>
         {fills.map((f) => (
-          <tr key={f.offerId} style={{ borderBottom: "1px solid #eee" }}>
-            <td>{f.sellerId}</td>
-            <td>{fmtEur(f.eurCents)}</td>
-            <td>{fmtXof(f.xofAmount)}</td>
-            <td>{f.rateXofPerEur}</td>
-          </tr>
+          <div key={f.offerId} className="alloc-seg" style={{ flexGrow: share(f), flexBasis: 0 }}
+            title={`${f.sellerId} : ${fmtSpent(direction, share(f))} à ${fmtRate(f.rateXofPerEur)} XOF / €`} />
         ))}
-      </tbody>
-    </table>
+        {unfilled > 0 && (
+          <div className="alloc-seg rest" style={{ flexGrow: unfilled, flexBasis: 0 }}
+            title={`${shortfall > 0 ? "Non servi" : "Reste technique"} : ${fmtSpent(direction, unfilled)}`} />
+        )}
+      </div>
+      <div className="legend">
+        <span><i /> Servi par vendeur ({fmtSpent(direction, spent)})</span>
+        {unfilled > 0 && (
+          <span>
+            <i className="rest" /> {shortfall > 0 ? "Non servi" : "Reste technique"} ({fmtSpent(direction, unfilled)})
+          </span>
+        )}
+      </div>
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Vendeur</th>
+              <th className="r">Vous payez</th>
+              <th className="r">Vous recevez</th>
+              <th className="r">Taux</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fills.map((f) => (
+              <tr key={f.offerId}>
+                <td><Seller id={f.sellerId} /></td>
+                <td className="r">{buyEur ? fmtXof(f.xofAmount) : fmtEur(f.eurCents)}</td>
+                <td className="r">{buyEur ? fmtEur(f.eurCents) : fmtXof(f.xofAmount)}</td>
+                <td className="r">{fmtRate(f.rateXofPerEur)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {shortfall > 0 && (
+        <div className="notice info">
+          <IconInfo />
+          <div>
+            <strong>{fmtSpent(direction, shortfall)} non servis</strong> : il n&apos;y a pas assez
+            d&apos;offres compatibles dans le carnet. Ce montant reste chez vous.
+          </div>
+        </div>
+      )}
+      {roundingXof > 0 && (
+        <div className="notice warn">
+          <IconWarn />
+          <div>
+            <strong>Reste technique : {fmtXof(roundingXof)}</strong>
+            {buyEur
+              ? " restent chez vous. C'est trop peu pour acheter 1 centime d'euro, ce montant n'est donc pas dépensé."
+              : " resteront chez les vendeurs servis. Ce reste vaut moins d'1 centime d'euro à leur taux et ne peut plus être apparié."}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+interface BookRow {
+  id: string;
+  ownerId: string;
+  /** Montant disponible, dans la devise vendue (centimes ou XOF). */
+  amount: number;
+  label: string;
+  rate: number;
+  dust: boolean;
+}
+
+function OrderBook({
+  direction,
+  eurBook,
+  xofBook,
+  fills,
+  consumedIds,
+}: {
+  direction: Direction;
+  eurBook: SellEurOffer[];
+  xofBook: SellXofOffer[];
+  fills: Fill[];
+  consumedIds: Set<string>;
+}) {
+  const buyEur = direction === "buyEur";
+  // Affichage dans l'ordre de passage du moteur.
+  const rows: BookRow[] = buyEur
+    ? [...eurBook]
+        .sort((a, b) => a.minRateXofPerEur - b.minRateXofPerEur || a.seq - b.seq)
+        .map((o) => ({
+          id: o.id, ownerId: o.ownerId, amount: o.eurCentsRemaining,
+          label: fmtEur(o.eurCentsRemaining), rate: o.minRateXofPerEur, dust: false,
+        }))
+    : [...xofBook]
+        .sort((a, b) => b.maxRateXofPerEur - a.maxRateXofPerEur || a.seq - b.seq)
+        .map((o) => ({
+          id: o.id, ownerId: o.ownerId, amount: o.xofRemaining,
+          label: fmtXof(o.xofRemaining), rate: o.maxRateXofPerEur, dust: isXofDust(o),
+        }));
+
+  if (rows.length === 0) return <p className="empty">Le carnet est vide. Ajoutez une offre ci-dessous.</p>;
+
+  const max = Math.max(...rows.map((r) => r.amount));
+  const matched = new Set(fills.map((f) => f.offerId));
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th className="col-rank">#</th>
+            <th>Vendeur</th>
+            <th className="r">Disponible</th>
+            <th className="r">{buyEur ? "Taux min." : "Taux max."}</th>
+            <th className="r">Aperçu</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id} className={matched.has(r.id) ? "is-matched" : undefined}>
+              <td className="rank col-rank">{i + 1}</td>
+              <td><Seller id={r.ownerId} /></td>
+              <td className="r">
+                {r.label}
+                <div className="depth" aria-hidden="true">
+                  <div style={{ width: `${(r.amount / max) * 100}%` }} />
+                </div>
+              </td>
+              <td className="r">{fmtRate(r.rate)}</td>
+              <td className="r">
+                {r.dust ? (
+                  <span className="badge dust" title="Vaut moins d'1 centime à ce taux : n'est plus appariable">
+                    Reste technique
+                  </span>
+                ) : matched.has(r.id) ? (
+                  <span className="badge matched">{consumedIds.has(r.id) ? "Épuisée" : "Partielle"}</span>
+                ) : (
+                  <span className="rank">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function NumberField({
+  label, suffix, value, onChange, step, min, hint,
+}: {
+  label: string;
+  suffix: string;
+  value: number;
+  onChange: (n: number) => void;
+  step: number;
+  min: number;
+  hint?: string;
+}) {
+  return (
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <span className="input-wrap">
+        <input type="number" inputMode="decimal" value={Number.isNaN(value) ? "" : value} step={step} min={min}
+          onChange={(e) => onChange(Number(e.target.value))} />
+        <span className="suffix">{suffix}</span>
+      </span>
+      {hint !== undefined && <span className="field-hint">{hint || " "}</span>}
+    </label>
+  );
+}
+
+function Seller({ id }: { id: string }) {
+  const n = id.replace(/\D/g, "") || "?";
+  return (
+    <span className="seller">
+      <span className="avatar" aria-hidden="true">V{n}</span>
+      Vendeur {n}
+    </span>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5 8.2l2 2 4-4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 7.2V11.5M8 4.8v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconWarn() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M8 1.8l6.6 11.7H1.4L8 1.8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8 6.5v3.2M8 11.6v.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
   );
 }
