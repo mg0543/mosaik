@@ -42,8 +42,19 @@ npm run dev     # http://localhost:3000
 ## Règles métier actuelles (à valider)
 
 - Taux de référence : 1 EUR = 655,957 XOF (parité fixe du franc CFA).
+- Deux sens d'échange, chacun avec son carnet :
+  - **Achat d'EUR** (`matchBuyRequest`) : la demande dépense des XOF auprès de vendeurs d'EUR
+    (taux minimum). Priorité : taux le plus **bas** d'abord.
+  - **Achat de XOF** (`matchBuyXofRequest`) : la demande dépense des EUR auprès de vendeurs de XOF
+    (taux maximum). Priorité : taux le plus **haut** d'abord.
+- À taux égal : ordre d'arrivée (premier arrivé, premier servi).
 - Chaque remplissage s'exécute au taux de l'offre (« pay-as-bid »).
-- Priorité : taux le plus bas en premier, puis ordre d'arrivée.
+- Arrondi : on choisit un nombre entier de centimes, puis le montant XOF vaut
+  `floor(centimes × taux / 100)`. Le budget du demandeur n'est jamais dépassé.
+- Restes techniques (quelques XOF, moins d'un centime) affichés et jamais masqués :
+  - achat d'EUR : `xofRoundingRemainder` = XOF trop peu nombreux pour acheter 1 centime ;
+  - achat de XOF : une offre dont le reste vaut moins d'un centime reste visible dans le carnet,
+    marquée comme non appariable.
 
 ## Avant toute mise en production
 
