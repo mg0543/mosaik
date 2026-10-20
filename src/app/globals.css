@@ -601,6 +601,29 @@ tr.is-matched td {
   border: 1px solid var(--warn-border);
 }
 
+.subhead {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+
+.plain-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.plain-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plain-list li:last-child {
+  border-bottom: 0;
+}
+
 .empty {
   color: var(--text-3);
   text-align: center;

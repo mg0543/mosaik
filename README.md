@@ -42,19 +42,19 @@ npm run dev     # http://localhost:3000
 ## Règles métier actuelles (à valider)
 
 - Taux de référence : 1 EUR = 655,957 XOF (parité fixe du franc CFA).
-- Deux sens d'échange, chacun avec son carnet :
-  - **Achat d'EUR** (`matchBuyRequest`) : la demande dépense des XOF auprès de vendeurs d'EUR
-    (taux minimum). Priorité : taux le plus **bas** d'abord.
-  - **Achat de XOF** (`matchBuyXofRequest`) : la demande dépense des EUR auprès de vendeurs de XOF
-    (taux maximum). Priorité : taux le plus **haut** d'abord.
-- À taux égal : ordre d'arrivée (premier arrivé, premier servi).
-- Chaque remplissage s'exécute au taux de l'offre (« pay-as-bid »).
-- Arrondi : on choisit un nombre entier de centimes, puis le montant XOF vaut
-  `floor(centimes × taux / 100)`. Le budget du demandeur n'est jamais dépassé.
-- Restes techniques (quelques XOF, moins d'un centime) affichés et jamais masqués :
-  - achat d'EUR : `xofRoundingRemainder` = XOF trop peu nombreux pour acheter 1 centime ;
-  - achat de XOF : une offre dont le reste vaut moins d'un centime reste visible dans le carnet,
-    marquée comme non appariable.
+- **Carnet d'ordres à deux côtés** (`placeOrder`) : vendeurs d'EUR (`SELL_EUR`, taux minimum)
+  et vendeurs de XOF (`SELL_XOF`, taux maximum). Un nouvel ordre se croise d'abord avec le
+  côté opposé ; son reste s'inscrit au carnet à son taux limite.
+- Priorité : meilleur taux pour l'ordre entrant, puis ordre d'arrivée.
+- Chaque échange s'exécute au taux de l'ordre déjà inscrit (« pay-as-bid »).
+- Un utilisateur n'est jamais apparié avec lui-même.
+- **Calcul exact** : montants en entiers (centimes, XOF), taux en millièmes de XOF par euro
+  (`655957` = 655,957), produits et divisions en `BigInt`. Aucun flottant dans les calculs d'argent.
+  Les saisies sont lues par `parseEurCents`, `parseXof` et `parseRate`, sans passer par un flottant.
+- Arrondi : le pivot est un nombre entier de centimes, le XOF est arrondi à l'inférieur.
+  Personne ne donne plus que ce qu'il a engagé.
+- **Restes techniques** : un ordre dont le reste vaut moins d'1 centime à son taux ne pourra
+  jamais être apparié. Il est clôturé et signalé dans `closed`, jamais masqué.
 
 ## Avant toute mise en production
 

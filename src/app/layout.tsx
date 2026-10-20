@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
-import { REFERENCE_RATE_XOF_PER_EUR } from "@/lib/matching";
+import { REFERENCE_RATE } from "@/lib/matching";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="ref-rate">
               Taux de référence
               <strong className="num">
-                1 EUR = {REFERENCE_RATE_XOF_PER_EUR.toLocaleString("fr-FR")} XOF
+                1 EUR = {(REFERENCE_RATE / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} XOF
               </strong>
               · parité fixe
             </div>
