@@ -77,6 +77,12 @@ npm run db:reset   # recrée la base à partir des migrations
 Le site est déployé sur Vercel à chaque push sur `main`. Sans base configurée, il affiche
 « pilote bientôt ouvert » et seul le simulateur fonctionne.
 
+État actuel : projet Supabase cloud `mosaik` créé (région Paris), schéma appliqué et droits
+vérifiés sur la base cloud. Le mot de passe de la base est dans `.env.cloud.local`, jamais versionné.
+
+**Dépôt public** : aucun secret ne doit y entrer. Clés et mots de passe vont dans les fichiers
+`.env*.local` (ignorés par git) et dans les variables d'environnement de Vercel.
+
 Pour ouvrir le pilote :
 
 1. Créer un projet Supabase (région Europe), puis `supabase link` et `supabase db push`.
