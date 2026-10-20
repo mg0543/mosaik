@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Liquidité EUR ↔ XOF (prototype)",
+  title: "Mosaik (prototype)",
   description: "Prototype de moteur de matching de liquidité multi-devises.",
 };
 

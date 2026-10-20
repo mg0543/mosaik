@@ -1,4 +1,4 @@
-# Faso Liquidity (prototype)
+# Mosaik (prototype)
 
 Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 

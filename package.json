@@ -1,5 +1,5 @@
 {
-  "name": "faso-liquidity",
+  "name": "mosaik",
   "version": "0.1.0",
   "description": "Moteur de matching de liquidité multi-devises (prototype)",
   "scripts": {
