@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { checkOrderPolicy, MAX_ORDER_XOF } from "./policy";
+import { checkActivityPolicy, checkOrderPolicy, MAX_OPEN_ORDERS, MAX_ORDER_XOF, MAX_ORDERS_PER_HOUR } from "./policy";
+
+describe("checkActivityPolicy", () => {
+  it("laisse passer une activité normale", () => {
+    expect(checkActivityPolicy(0, 0)).toBeNull();
+    expect(checkActivityPolicy(MAX_OPEN_ORDERS - 1, MAX_ORDERS_PER_HOUR - 1)).toBeNull();
+  });
+
+  it("bloque au-delà des ordres ouverts ou du rythme horaire", () => {
+    expect(checkActivityPolicy(MAX_OPEN_ORDERS, 0)).toMatch(/ordres en attente/);
+    expect(checkActivityPolicy(0, MAX_ORDERS_PER_HOUR)).toMatch(/par heure/);
+  });
+});
 
 describe("checkOrderPolicy", () => {
   it("accepte un ordre raisonnable dans les deux sens", () => {

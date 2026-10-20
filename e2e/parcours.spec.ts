@@ -53,6 +53,8 @@ test("deux participants s'échangent des devises de bout en bout", async ({ brow
   // Bob ne peut pas ouvrir l'ordre d'Alice, même avec son adresse exacte.
   const forbidden = await pageB.goto(orderA);
   expect(forbidden?.status()).toBe(404);
+  await expect(pageB.getByRole("heading", { name: "Introuvable" })).toBeVisible();
+  await expect(pageB.getByText(/656\s000 XOF/)).toHaveCount(0);
 
   // Alice annule le reste de son ordre.
   await pageA.getByRole("button", { name: "Annuler l'ordre" }).click();

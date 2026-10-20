@@ -10,6 +10,26 @@ export const RATE_BAND_PCT = 15;
 /** Montant maximal d'un ordre, exprimé en XOF (au taux de référence pour un ordre en euros). */
 export const MAX_ORDER_XOF = 5_000_000;
 
+/** Nombre maximal d'ordres ouverts en même temps par utilisateur. */
+export const MAX_OPEN_ORDERS = 10;
+
+/** Nombre maximal d'ordres passés par heure et par utilisateur. */
+export const MAX_ORDERS_PER_HOUR = 30;
+
+/**
+ * Limites d'activité : empêchent un compte de saturer le carnet. Renvoie la raison du refus,
+ * ou null. À vérifier sous le verrou du carnet, avec des compteurs lus dans la même transaction.
+ */
+export function checkActivityPolicy(openOrders: number, ordersLastHour: number): string | null {
+  if (openOrders >= MAX_OPEN_ORDERS) {
+    return `Vous avez déjà ${MAX_OPEN_ORDERS} ordres en attente : annulez-en un avant d'en passer un nouveau.`;
+  }
+  if (ordersLastHour >= MAX_ORDERS_PER_HOUR) {
+    return `Limite de ${MAX_ORDERS_PER_HOUR} ordres par heure atteinte. Réessayez un peu plus tard.`;
+  }
+  return null;
+}
+
 /** Renvoie la raison du refus, ou null si l'ordre respecte les garde-fous. */
 export function checkOrderPolicy(side: Side, amount: number, limitRate: RateMilli): string | null {
   const low = Math.ceil((REFERENCE_RATE * (100 - RATE_BAND_PCT)) / 100);

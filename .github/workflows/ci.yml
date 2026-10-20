@@ -1,0 +1,65 @@
+# Intégration continue : chaque push et chaque pull request passent par toute la batterie de tests.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unitaires:
+    name: Tests unitaires et build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # Build sans base configurée : vérifie que le site reste servi (« pilote bientôt ouvert »).
+      - run: npm run build
+
+  integration:
+    name: Base de données et bout en bout
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Démarrer Supabase local
+        run: npm run db:start
+      - name: Écrire .env.local pour l'instance locale
+        run: |
+          supabase status -o env > /tmp/sb.env
+          . /tmp/sb.env
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "DATABASE_URL=$DB_URL"
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3100"
+          } > .env.local
+      - name: Tests d'intégration
+        run: npm run test:db
+      - name: Tests de bout en bout (Chrome)
+        run: npm run test:e2e
+      - name: Traces en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

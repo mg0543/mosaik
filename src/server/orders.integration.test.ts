@@ -107,6 +107,41 @@ describe("placeOrderForUser", () => {
   });
 });
 
+describe("limites d'activité", () => {
+  it("refuse un ordre de plus quand l'utilisateur a déjà 10 ordres en attente", async () => {
+    for (let i = 0; i < 10; i++) {
+      await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 });
+    }
+    await expect(
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 }),
+    ).rejects.toThrow(/10 ordres en attente/);
+    // Les autres utilisateurs ne sont pas concernés.
+    await expect(
+      placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 }),
+    ).resolves.toBeDefined();
+  });
+
+  it("tient sous une rafale d'envois simultanés : exactement 10 ordres acceptés", async () => {
+    const burst = await Promise.allSettled(
+      Array.from({ length: 15 }, () =>
+        placeOrderForUser(sql, { userId: users.chloe, side: "SELL_XOF", amount: 100_000, limitRate: 600_000 }),
+      ),
+    );
+    expect(burst.filter((o) => o.status === "fulfilled")).toHaveLength(10);
+    expect((await allOrders()).filter((o) => o.owner_id === users.chloe)).toHaveLength(10);
+  });
+
+  it("applique aussi les garde-fous de montant et de taux côté service", async () => {
+    await expect(
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 100_000, limitRate: 6_559_000 }),
+    ).rejects.toThrow(/Taux hors limites/);
+    await expect(
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 5_000_001, limitRate: 655_957 }),
+    ).rejects.toThrow(/Montant trop élevé/);
+    expect(await allOrders()).toHaveLength(0);
+  });
+});
+
 describe("cancelOrderForUser", () => {
   it("annule son propre ordre ouvert, qui n'est plus apparié ensuite", async () => {
     const { orderId } = await placeOrderForUser(sql, {
@@ -261,11 +296,17 @@ describe("concurrence", () => {
       };
     });
 
-    await Promise.all(inputs.map((input) => placeOrderForUser(sql, input)));
+    const outcomes = await Promise.allSettled(inputs.map((input) => placeOrderForUser(sql, input)));
+    // Seuls des refus de limite d'activité sont admis ; tout autre échec est un bug.
+    for (const o of outcomes) {
+      if (o.status === "rejected") expect(String(o.reason)).toMatch(/ordres en attente|par heure/);
+    }
+    const accepted = outcomes.filter((o) => o.status === "fulfilled").length;
 
     const orders = await allOrders();
     const trades = await allTrades();
-    expect(orders).toHaveLength(60);
+    expect(orders).toHaveLength(accepted);
+    expect(accepted).toBeGreaterThan(40);
     expect(trades.length).toBeGreaterThan(0);
 
     // 1. Conservation : pour chaque ordre, montant = reste + échangé + reste technique.

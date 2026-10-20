@@ -1,4 +1,5 @@
 import { assertValidOrder, placeOrder, type Order, type PlaceOrderResult, type Side } from "../lib/matching";
+import { checkActivityPolicy, checkOrderPolicy } from "../lib/policy";
 import type { Sql } from "./db";
 
 /**
@@ -50,11 +51,22 @@ const toOrder = (row: OrderRow): Order => ({
  */
 export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise<PlacedOrder> {
   const { userId, side, amount, limitRate } = input;
-  // Validation avant toute écriture : mêmes règles que le moteur.
+  // Validation avant toute écriture : mêmes règles que le moteur, plus les garde-fous du pilote.
   assertValidOrder({ id: "nouvel-ordre", ownerId: userId, side, remaining: amount, limitRate, seq: 0 });
+  const refusal = checkOrderPolicy(side, amount, limitRate);
+  if (refusal) throw new RangeError(refusal);
 
   return sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${ORDER_BOOK_LOCK})`;
+
+    // Limites d'activité, lues sous le verrou : deux envois simultanés ne peuvent pas les contourner.
+    const [activity] = await tx<{ open: number; recent: number }[]>`
+      select count(*) filter (where status = 'open')::int as open,
+             count(*) filter (where created_at > now() - interval '1 hour')::int as recent
+      from public.orders where owner_id = ${userId}
+    `;
+    const tooActive = checkActivityPolicy(activity.open, activity.recent);
+    if (tooActive) throw new RangeError(tooActive);
 
     const [created] = await tx<{ id: string; seq: number }[]>`
       insert into public.orders (owner_id, side, amount, remaining, limit_rate)
