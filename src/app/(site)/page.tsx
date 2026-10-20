@@ -72,8 +72,9 @@ export default async function HomePage() {
             carnet à votre taux.
           </li>
           <li>
-            <strong>Vous suivez chaque échange.</strong> Montants, taux et contreparties anonymes
-            sont visibles dans votre espace, au centime près.
+            <strong>Vous réglez directement.</strong> Pour chaque échange, Mosaik vous indique combien
+            envoyer et à qui. Celui dont l&apos;ordre est arrivé en dernier paie en premier ; chacun
+            confirme l&apos;envoi puis la réception, dans les 24 heures.
           </li>
         </ol>
       </section>
@@ -84,7 +85,10 @@ export default async function HomePage() {
           <li><strong>Jamais au-delà de votre taux.</strong> Chaque échange se fait au taux affiché ou mieux pour vous.</li>
           <li><strong>Calcul exact.</strong> Montants en centimes et en XOF entiers ; l&apos;écart d&apos;arrondi reste inférieur à 1 XOF par échange, et tout reste est affiché.</li>
           <li><strong>Pas de fonds détenus.</strong> Pendant le pilote, Mosaik ne reçoit ni ne transfère d&apos;argent.</li>
-          <li><strong>Anonymat entre participants.</strong> Personne ne voit votre adresse e-mail.</li>
+          <li>
+            <strong>Discrétion.</strong> Votre adresse e-mail n&apos;est jamais affichée ; vos coordonnées de
+            paiement ne sont transmises qu&apos;à vos contreparties, pour l&apos;échange concerné.
+          </li>
         </ul>
       </section>
     </>

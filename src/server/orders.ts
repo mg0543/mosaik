@@ -1,6 +1,8 @@
 import { assertValidOrder, placeOrder, type Order, type PlaceOrderResult, type Side } from "../lib/matching";
+import { payToFor, receivedCurrency, type PayTo } from "../lib/payment";
 import { checkActivityPolicy, checkOrderPolicy } from "../lib/policy";
 import type { Sql } from "./db";
+import { getPaymentDetails, getPaymentDetailsOf } from "./settlements";
 
 /**
  * Clé du verrou consultatif qui protège le carnet. Chaque passage ou annulation d'ordre
@@ -56,6 +58,15 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
   const refusal = checkOrderPolicy(side, amount, limitRate);
   if (refusal) throw new RangeError(refusal);
 
+  // Sans coordonnée pour recevoir, la contrepartie ne saurait pas où payer.
+  const received = receivedCurrency(side);
+  const takerPayTo = payToFor(await getPaymentDetails(sql, userId), received);
+  if (!takerPayTo) {
+    throw new RangeError(
+      `Renseignez d'abord vos coordonnées pour recevoir des ${received === "EUR" ? "euros" : "XOF"} (onglet Compte).`,
+    );
+  }
+
   return sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${ORDER_BOOK_LOCK})`;
 
@@ -92,7 +103,7 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
     const result = placeOrder(makers.map(toOrder), taker);
 
     if (result.trades.length > 0) {
-      await tx`
+      const inserted = await tx<{ id: string; maker_order_id: string }[]>`
         insert into public.trades ${tx(
           result.trades.map((t) => ({
             maker_order_id: t.makerOrderId,
@@ -102,6 +113,35 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
             eur_cents: t.eurCents,
             xof: t.xof,
             rate: t.rate,
+          })),
+        )}
+        returning id, maker_order_id
+      `;
+      // Un règlement par échange, avec les coordonnées de chacun figées à cet instant.
+      const tradeIdOf = new Map(inserted.map((r) => [r.maker_order_id, r.id]));
+      const makerIds = [...new Set(result.trades.map((t) => t.makerId))];
+      const makerDetails = await getPaymentDetailsOf(tx, makerIds);
+      const makerPayTo = new Map<string, PayTo>();
+      for (const makerId of makerIds) {
+        // Le faiseur reçoit la devise que donne le preneur.
+        const details = makerDetails.get(makerId);
+        const payTo = details ? payToFor(details, side === "SELL_XOF" ? "XOF" : "EUR") : null;
+        if (!payTo) throw new Error(`Coordonnées de réception manquantes pour une contrepartie (${makerId}).`);
+        makerPayTo.set(makerId, payTo);
+      }
+      await tx`
+        insert into public.settlements ${tx(
+          result.trades.map((t) => ({
+            trade_id: tradeIdOf.get(t.makerOrderId)!,
+            taker_id: t.takerId,
+            maker_id: t.makerId,
+            // Le preneur envoie en premier la devise qu'il donne, sur le compte du faiseur.
+            taker_currency: side === "SELL_XOF" ? "XOF" : "EUR",
+            taker_amount: side === "SELL_XOF" ? t.xof : t.eurCents,
+            taker_pays_to: tx.json(makerPayTo.get(t.makerId)!),
+            // Le faiseur envoie ensuite sa part, sur le compte du preneur.
+            maker_amount: side === "SELL_XOF" ? t.eurCents : t.xof,
+            maker_pays_to: tx.json(takerPayTo),
           })),
         )}
       `;

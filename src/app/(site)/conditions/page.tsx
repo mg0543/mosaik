@@ -55,7 +55,23 @@ export default function TermsPage() {
 
       <h2>5. Règlement entre participants</h2>
       <p>
-        <Todo>modalités du règlement entre participants appariés : décision en attente</Todo>
+        Chaque échange se règle directement entre les deux participants, sans que l&apos;argent transite
+        par Mosaik :
+      </p>
+      <ol>
+        <li>
+          le participant dont l&apos;ordre est arrivé en dernier envoie sa part en premier, sur les
+          coordonnées indiquées par Mosaik, et le confirme ;
+        </li>
+        <li>l&apos;autre participant vérifie la réception, le confirme, puis envoie sa part et le confirme ;</li>
+        <li>le premier confirme la réception : l&apos;échange est réglé.</li>
+      </ol>
+      <p>
+        Le règlement doit être fait dans les 24 heures suivant l&apos;échange. Chaque participant peut
+        signaler un problème à tout moment avant la fin du règlement ; le règlement est alors gelé.
+        Mosaik ne garantit pas le paiement par la contrepartie et ne peut pas annuler un paiement effectué.
+        Pour passer un ordre, vous devez renseigner les coordonnées où vous souhaitez être payé.{" "}
+        <Todo>traitement des litiges, des retards et conséquences pour le participant défaillant</Todo>
       </p>
 
       <h2>6. Vos engagements</h2>

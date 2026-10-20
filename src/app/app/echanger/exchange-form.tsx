@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { averageRate, fmtEur, fmtGiven, fmtPct, fmtRate, fmtReceived, fmtXof, rateGap } from "@/lib/format";
 import { eurCentsForXof, parseEurCents, parseRate, parseXof, REFERENCE_RATE, xofForEurCents, type Side } from "@/lib/matching";
@@ -24,7 +25,7 @@ function computePreview(book: PublicBookEntry[], side: Side, amount: number | nu
   return result.ok ? { result: result.value } : { refusal: result.error };
 }
 
-export function ExchangeForm({ book }: { book: PublicBookEntry[] }) {
+export function ExchangeForm({ book, canReceive }: { book: PublicBookEntry[]; canReceive: Record<Side, boolean> }) {
   const [state, action, pending] = useActionState<ExchangeState, FormData>(placeOrderAction, {});
   const [side, setSide] = useState<Side>("SELL_XOF");
   const [amounts, setAmounts] = useState<Record<Side, string>>({ SELL_XOF: "", SELL_EUR: "" });
@@ -91,14 +92,26 @@ export function ExchangeForm({ book }: { book: PublicBookEntry[] }) {
         </div>
       </section>
 
+      {!canReceive[side] && (
+        <div className="notice warn" role="note" style={{ marginTop: 0 }}>
+          <div>
+            Pour recevoir des {sellXof ? "euros" : "XOF"}, renseignez d&apos;abord{" "}
+            {sellXof ? "votre IBAN" : "votre numéro mobile money"} : c&apos;est là que vos contreparties vous
+            paieront. <Link href="/app/compte">Compléter mon compte</Link>
+          </div>
+        </div>
+      )}
+
       {state.error && <p className="error" role="alert">{state.error}</p>}
 
-      <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={pending || !preview || "refusal" in preview}>
+      <button type="submit" className="btn btn-primary btn-lg btn-block"
+        disabled={pending || !preview || "refusal" in preview || !canReceive[side]}>
         {pending ? "Enregistrement…" : "Confirmer l'ordre"}
       </button>
       <p className="field-hint center">
         L&apos;exécution a lieu au moment de la confirmation, au meilleur des offres disponibles à cet
-        instant, jamais au-delà de votre taux. Aucun argent ne transite par Mosaik.
+        instant, jamais au-delà de votre taux. Vous réglez ensuite chaque échange directement avec votre
+        contrepartie, dans les 24 heures ; aucun argent ne transite par Mosaik.
       </p>
     </form>
   );

@@ -4,14 +4,20 @@ import { OrderListItem } from "@/components/orders";
 import { fmtEur, fmtRate, fmtXof } from "@/lib/format";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
+import { LocalDate } from "@/components/local-date";
 import { getMarketSnapshot, getMyOrders } from "@/server/queries";
+import { getPendingActions } from "@/server/settlements";
 
 export const metadata: Metadata = { title: "Accueil" };
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const sql = getSql();
-  const [market, orders] = await Promise.all([getMarketSnapshot(sql), getMyOrders(sql, user.id, 20)]);
+  const [market, orders, toDo] = await Promise.all([
+    getMarketSnapshot(sql),
+    getMyOrders(sql, user.id, 20),
+    getPendingActions(sql, user.id),
+  ]);
   const open = orders.filter((o) => o.status === "open");
   const recent = orders.slice(0, 5);
 
@@ -19,6 +25,28 @@ export default async function DashboardPage() {
     <div className="app-page">
       <h1 className="app-title">Bonjour</h1>
       <p className="muted app-subtitle">{user.email}</p>
+
+      {toDo.length > 0 && (
+        <section className="card todo-card" aria-labelledby="todo-title">
+          <div className="card-body">
+            <h2 id="todo-title" className="section-title" style={{ marginTop: 0 }}>
+              À faire ({toDo.length})
+            </h2>
+            <ul className="todo-list">
+              {toDo.map((a) => (
+                <li key={a.tradeId}>
+                  <Link href={"/app/ordres/" + a.orderId}>
+                    <strong>
+                      {a.step === "taker_sent" || a.step === "maker_sent" ? "Envoyer votre paiement" : "Confirmer une réception"}
+                    </strong>
+                    <span className="muted"> · avant le <LocalDate date={a.dueAt} /></span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       <section className="market-grid compact" aria-label="Marché">
         <div className="card market-card">

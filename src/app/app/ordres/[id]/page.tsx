@@ -7,7 +7,9 @@ import { averageRate, fmtEur, fmtGiven, fmtPct, fmtRate, fmtReceived, fmtXof, si
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
 import { getMyOrder } from "@/server/queries";
+import { actionFor } from "@/lib/settlement";
 import { CancelForm } from "./cancel-form";
+import { SettlementCard } from "./settlement-card";
 
 export const metadata: Metadata = { title: "Détail de l'ordre" };
 
@@ -24,6 +26,8 @@ export default async function OrderPage({
   if (!data) notFound();
   const { order, trades } = data;
   const sellXof = order.side === "SELL_XOF";
+  const now = new Date();
+  const toDo = trades.filter((t) => t.settlement && actionFor(t.settlement, t.role)).length;
 
   return (
     <div className="app-page">
@@ -36,6 +40,15 @@ export default async function OrderPage({
             {trades.length > 0
               ? `Servi tout de suite par ${trades.length} contrepartie${trades.length > 1 ? "s" : ""}.`
               : "Il attend dans le carnet qu'une contrepartie le croise."}
+          </div>
+        </div>
+      )}
+
+      {toDo > 0 && (
+        <div className="notice warn" role="status">
+          <div>
+            <strong>Action requise :</strong> {toDo} règlement{toDo > 1 ? "s attendent" : " attend"} une action de
+            votre part. <a href="#echanges">Y aller</a>
           </div>
         </div>
       )}
@@ -68,27 +81,30 @@ export default async function OrderPage({
         </div>
       </section>
 
-      <section aria-labelledby="trades-title">
+      <section aria-labelledby="trades-title" id="echanges" className="anchor-target">
         <h2 id="trades-title" className="section-title">Échanges ({trades.length})</h2>
         {trades.length === 0 ? (
           <p className="muted">Aucun échange pour l&apos;instant.</p>
         ) : (
           <ul className="trade-list">
-            {trades.map((t, i) => (
-              <li key={t.id} className="card trade-item">
-                <div className="trade-head">
-                  <span>Contrepartie {i + 1}</span>
-                  <span className="muted"><LocalDate date={t.createdAt} /></span>
-                </div>
-                <div className="trade-amounts num">
-                  <span>Donné : {sellXof ? fmtXof(t.xof) : fmtEur(t.eurCents)}</span>
-                  <span>Reçu : {sellXof ? fmtEur(t.eurCents) : fmtXof(t.xof)}</span>
-                </div>
-                <div className="muted trade-rate">
-                  Taux {fmtRate(t.rate)} · {t.role === "maker" ? "votre ordre attendait dans le carnet" : "servi à l'arrivée de votre ordre"}
-                </div>
-              </li>
-            ))}
+            {trades.map((t, i) =>
+              t.settlement ? (
+                <SettlementCard key={t.id} index={i + 1} tradeId={t.id} orderId={order.id} role={t.role} rate={t.rate}
+                  createdAt={t.createdAt} settlement={t.settlement} now={now} />
+              ) : (
+                <li key={t.id} className="card trade-item">
+                  <div className="trade-head">
+                    <span>Contrepartie {i + 1}</span>
+                    <span className="muted"><LocalDate date={t.createdAt} /></span>
+                  </div>
+                  <div className="trade-amounts num">
+                    <span>Donné : {sellXof ? fmtXof(t.xof) : fmtEur(t.eurCents)}</span>
+                    <span>Reçu : {sellXof ? fmtEur(t.eurCents) : fmtXof(t.xof)}</span>
+                  </div>
+                  <div className="muted trade-rate">Taux {fmtRate(t.rate)}</div>
+                </li>
+              ),
+            )}
           </ul>
         )}
       </section>
@@ -96,8 +112,8 @@ export default async function OrderPage({
       {order.status === "open" && <CancelForm orderId={order.id} remainingLabel={fmtGiven(order.side, order.remaining)} />}
 
       <p className="field-hint">
-        Mosaik enregistre l&apos;appariement ; le règlement entre participants a lieu hors de la plateforme
-        pendant le pilote.
+        Chaque échange se règle directement entre les deux participants : celui dont l&apos;ordre est arrivé en
+        dernier envoie sa part en premier. Mosaik ne reçoit ni ne transfère aucun argent.
       </p>
     </div>
   );

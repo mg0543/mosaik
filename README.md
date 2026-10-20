@@ -10,7 +10,9 @@ Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 
 - `src/lib/` : code pur et testé, partagé entre navigateur et serveur.
   - `matching.ts` : moteur du carnet d'ordres (calcul exact en entiers) ;
-  - `policy.ts` : garde-fous du pilote (taux à ±15 % de la référence, 5 000 000 XOF max par ordre) ;
+  - `policy.ts` : garde-fous du pilote (taux à ±15 % de la référence, 500 000 XOF max par ordre,
+    10 ordres ouverts, 30 ordres par heure) ;
+  - `payment.ts`, `settlement.ts` : coordonnées de réception (IBAN, mobile money) et protocole de règlement ;
   - `preview.ts`, `format.ts`, `order-status.ts` : aperçu, affichage, statuts.
 - `src/server/` : accès à la base et authentification, côté serveur uniquement.
   - `orders.ts` : passage et annulation d'ordres dans une transaction sous verrou ;
@@ -93,6 +95,27 @@ Pour ouvrir le pilote :
 3. Dans Vercel > Settings > Environment Variables : `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL` (pooler Supabase, mode transaction, port 6543)
    et `NEXT_PUBLIC_SITE_URL`. Redéployer.
+
+## Inviter un participant au pilote
+
+Le pilote est sur invitation : seules les adresses invitées peuvent recevoir un code de connexion.
+Dans Supabase > SQL Editor :
+
+```sql
+insert into public.pilot_invites (email, note) values ('prenom.nom@exemple.com', 'invité par …');
+```
+
+## Règlement entre participants (pilote)
+
+Mosaik ne reçoit, ne détient ni ne transfère aucun fonds. Chaque échange se règle directement :
+
+1. le preneur (ordre arrivé en dernier) envoie sa part sur les coordonnées du faiseur et le confirme ;
+2. le faiseur confirme la réception, envoie sa part et le confirme ;
+3. le preneur confirme la réception : l'échange est réglé.
+
+Délai de 24 h ; chacun peut signaler un litige, ce qui gèle le règlement. Les coordonnées de
+réception (IBAN, mobile money) sont obligatoires pour passer un ordre et sont figées dans chaque
+échange. Les litiges se consultent pour l'instant dans la table `settlements` (`disputed_at`).
 
 ## Règles métier actuelles (à valider)
 

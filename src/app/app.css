@@ -617,7 +617,8 @@ a {
   color: var(--text-2);
 }
 
-.legal ul {
+.legal ul,
+.legal ol {
   padding-left: 20px;
   display: grid;
   gap: 6px;
@@ -639,4 +640,223 @@ mark.todo {
   border-radius: 4px;
   padding: 0 4px;
   font-weight: 500;
+}
+
+/* ---------- Coordonnées de réception ---------- */
+
+.details-title {
+  font-size: 15px;
+  margin: 0 0 2px;
+}
+
+.input-wrap select {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 10px 12px;
+  font-size: 15px;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+/* ---------- Règlement ---------- */
+
+.chip-wait {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--border-strong);
+}
+
+.chip-todo {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chip-late,
+.chip-dispute {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid var(--warn-border);
+}
+
+.settlement {
+  display: flex;
+  flex-direction: column;
+}
+
+.steps-track {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.steps-track li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+}
+
+.step-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex: none;
+}
+
+.steps-track li.is-done {
+  color: var(--text-2);
+}
+
+.steps-track li.is-done .step-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.steps-track li.is-current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.steps-track li.is-current .step-mark {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.step-box {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step-box-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pay-to {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+}
+
+.pay-to > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.pay-to > div:last-child {
+  border-bottom: 0;
+}
+
+.pay-to dt {
+  color: var(--text-2);
+}
+
+.pay-to dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+  /* Coupure entre les groupes de l'IBAN seulement, jamais au milieu d'un groupe. */
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.waiting {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+
+.dispute-link {
+  margin-top: 10px;
+  align-self: flex-start;
+}
+
+.dispute-reason {
+  margin: 6px 0 0;
+  font-style: italic;
+}
+
+/* ---------- À faire ---------- */
+
+.todo-card {
+  border-color: var(--accent);
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.todo-list li {
+  border-top: 1px solid var(--border);
+}
+
+.todo-list a {
+  display: block;
+  padding: 10px 0;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+/* Cible d'ancre : laisse la place de l'en-tête collant. */
+.anchor-target {
+  scroll-margin-top: 72px;
+}
+
+.card-body > .facts:first-child {
+  margin-top: 0;
 }

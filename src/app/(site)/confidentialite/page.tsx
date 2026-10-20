@@ -21,6 +21,14 @@ export default function PrivacyPage() {
         <li><strong>Votre adresse e-mail</strong>, pour créer votre compte et vous envoyer vos codes de connexion.</li>
         <li><strong>Vos ordres et vos échanges</strong> : sens, montants, taux, dates et statuts.</li>
         <li>
+          <strong>Vos coordonnées de réception</strong> : IBAN et nom du titulaire pour recevoir des euros ;
+          opérateur, numéro mobile money et nom du titulaire pour recevoir des XOF.
+        </li>
+        <li>
+          <strong>Le suivi du règlement</strong> : vos confirmations d&apos;envoi et de réception, et les
+          éventuels signalements de litige avec leur description.
+        </li>
+        <li>
           <strong>Des cookies de session</strong>, strictement nécessaires pour vous garder connecté. Ils ne
           servent ni à la publicité ni à la mesure d&apos;audience.
         </li>
@@ -39,6 +47,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Gérer votre compte et votre connexion.</li>
         <li>Enregistrer vos ordres et les apparier avec ceux d&apos;autres participants.</li>
+        <li>Permettre à vos contreparties de vous payer, et suivre le règlement de chaque échange.</li>
         <li>Assurer la sécurité du service et prévenir les abus (limites d&apos;activité, journaux).</li>
       </ul>
       <p>
@@ -49,8 +58,12 @@ export default function PrivacyPage() {
       <h2>Ce que voient les autres participants</h2>
       <p>
         Personne ne voit votre adresse e-mail. Les autres participants voient seulement le carnet
-        d&apos;ordres anonyme : sens, montant restant et taux de chaque ordre en attente. Dans le détail de
-        vos échanges, vos contreparties sont désignées par un numéro, jamais par leur identité.
+        d&apos;ordres anonyme : sens, montant restant et taux de chaque ordre en attente.
+      </p>
+      <p>
+        Lorsqu&apos;un échange est conclu, votre contrepartie reçoit, pour cet échange uniquement, les
+        coordonnées où elle doit vous payer : votre IBAN ou votre numéro mobile money, et le nom du
+        titulaire. Ces coordonnées sont figées dans l&apos;échange, même si vous les modifiez ensuite.
       </p>
 
       <h2>Où sont vos données et qui y a accès</h2>

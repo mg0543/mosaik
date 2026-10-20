@@ -1,4 +1,6 @@
 import type { RateMilli, Side } from "../lib/matching";
+import type { PayTo } from "../lib/payment";
+import type { SettlementState } from "../lib/settlement";
 import type { Sql } from "./db";
 
 /**
@@ -120,6 +122,16 @@ async function selectMyOrders(
   return rows.map(toMyOrder);
 }
 
+/** Règlement d'un échange, vu par l'un de ses deux participants. */
+export interface SettlementView extends SettlementState {
+  /** Ce que vous devez envoyer, et où (coordonnées de la contrepartie, figées à l'échange). */
+  youSend: { currency: "EUR" | "XOF"; amount: number; payTo: PayTo };
+  /** Ce que vous devez recevoir. */
+  youReceive: { currency: "EUR" | "XOF"; amount: number };
+  disputedByYou: boolean;
+  disputeReason: string | null;
+}
+
 export interface OrderTrade {
   id: string;
   eurCents: number;
@@ -128,9 +140,53 @@ export interface OrderTrade {
   createdAt: Date;
   /** « maker » : votre ordre attendait dans le carnet ; « taker » : votre ordre est arrivé. */
   role: "maker" | "taker";
+  settlement: SettlementView | null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface TradeRow {
+  id: string;
+  eur_cents: number;
+  xof: number;
+  rate: number;
+  created_at: Date;
+  role: "maker" | "taker";
+  s_trade_id: string | null;
+  taker_currency: "EUR" | "XOF" | null;
+  taker_amount: number | null;
+  taker_pays_to: PayTo | null;
+  maker_amount: number | null;
+  maker_pays_to: PayTo | null;
+  due_at: Date | null;
+  taker_sent_at: Date | null;
+  maker_received_at: Date | null;
+  maker_sent_at: Date | null;
+  taker_received_at: Date | null;
+  disputed_at: Date | null;
+  disputed_by: string | null;
+  dispute_reason: string | null;
+}
+
+function toSettlementView(r: TradeRow, userId: string): SettlementView | null {
+  if (!r.s_trade_id || !r.taker_currency || !r.due_at) return null;
+  const other = r.taker_currency === "EUR" ? "XOF" : "EUR";
+  const taker = r.role === "taker";
+  return {
+    dueAt: r.due_at,
+    takerSentAt: r.taker_sent_at,
+    makerReceivedAt: r.maker_received_at,
+    makerSentAt: r.maker_sent_at,
+    takerReceivedAt: r.taker_received_at,
+    disputedAt: r.disputed_at,
+    youSend: taker
+      ? { currency: r.taker_currency, amount: r.taker_amount!, payTo: r.taker_pays_to! }
+      : { currency: other, amount: r.maker_amount!, payTo: r.maker_pays_to! },
+    youReceive: taker ? { currency: other, amount: r.maker_amount! } : { currency: r.taker_currency, amount: r.taker_amount! },
+    disputedByYou: r.disputed_by === userId,
+    disputeReason: r.dispute_reason,
+  };
+}
 
 /** Un ordre de l'utilisateur et ses échanges, ou null s'il n'existe pas ou n'est pas à lui. */
 export async function getMyOrder(
@@ -141,15 +197,27 @@ export async function getMyOrder(
   if (!UUID.test(orderId)) return null;
   const orders = await selectMyOrders(sql, userId, { limit: 1, orderId });
   if (orders.length === 0) return null;
-  const trades = await sql<{ id: string; eur_cents: number; xof: number; rate: number; created_at: Date; role: "maker" | "taker" }[]>`
-    select id, eur_cents, xof, rate, created_at,
-           case when maker_order_id = ${orderId} then 'maker' else 'taker' end as role
-    from public.trades
-    where maker_order_id = ${orderId} or taker_order_id = ${orderId}
-    order by seq
+  const rows = await sql<TradeRow[]>`
+    select t.id, t.eur_cents, t.xof, t.rate, t.created_at,
+           case when t.maker_order_id = ${orderId} then 'maker' else 'taker' end as role,
+           s.trade_id as s_trade_id, s.taker_currency, s.taker_amount, s.taker_pays_to, s.maker_amount,
+           s.maker_pays_to, s.due_at, s.taker_sent_at, s.maker_received_at, s.maker_sent_at,
+           s.taker_received_at, s.disputed_at, s.disputed_by, s.dispute_reason
+    from public.trades t
+    left join public.settlements s on s.trade_id = t.id
+    where t.maker_order_id = ${orderId} or t.taker_order_id = ${orderId}
+    order by t.seq
   `;
   return {
     order: orders[0],
-    trades: trades.map((t) => ({ id: t.id, eurCents: t.eur_cents, xof: t.xof, rate: t.rate, createdAt: t.created_at, role: t.role })),
+    trades: rows.map((r) => ({
+      id: r.id,
+      eurCents: r.eur_cents,
+      xof: r.xof,
+      rate: r.rate,
+      createdAt: r.created_at,
+      role: r.role,
+      settlement: toSettlementView(r, userId),
+    })),
   };
 }

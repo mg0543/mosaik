@@ -7,6 +7,9 @@ import postgres from "postgres";
  */
 export type Sql = postgres.Sql<{ bigint: number }>;
 
+/** Connexion ou transaction en cours : les lectures acceptent l'une comme l'autre. */
+export type Queryable = Sql | postgres.TransactionSql<{ bigint: number }>;
+
 export function createSql(url: string, options: { max?: number } = {}): Sql {
   return postgres(url, {
     max: options.max ?? 5,

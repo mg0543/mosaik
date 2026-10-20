@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { isBackendConfigured, siteUrl } from "@/server/config";
+import { getSql } from "@/server/db";
+import { canSignIn } from "@/server/invites";
 import { createSupabaseServerClient } from "@/server/supabase";
 
 export type LoginState =
@@ -29,6 +31,13 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const supabase = await createSupabaseServerClient();
 
   if (intent === "send" || intent === "resend") {
+    if (!(await canSignIn(getSql(), email))) {
+      return {
+        step: "email",
+        email,
+        error: "Le pilote est sur invitation : cette adresse n'a pas encore été invitée.",
+      };
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { shouldCreateUser: true, emailRedirectTo: `${siteUrl()}/auth/confirm` },

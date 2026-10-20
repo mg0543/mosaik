@@ -8,7 +8,8 @@ import { REFERENCE_RATE, xofForEurCents, type RateMilli, type Side } from "./mat
 export const RATE_BAND_PCT = 15;
 
 /** Montant maximal d'un ordre, exprimé en XOF (au taux de référence pour un ordre en euros). */
-export const MAX_ORDER_XOF = 5_000_000;
+// Bas pendant le pilote : le règlement se fait directement entre participants, sans séquestre.
+export const MAX_ORDER_XOF = 500_000;
 
 /** Nombre maximal d'ordres ouverts en même temps par utilisateur. */
 export const MAX_OPEN_ORDERS = 10;
