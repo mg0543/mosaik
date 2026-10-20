@@ -11,6 +11,15 @@ test.describe("visiteur", () => {
     await expect(page).toHaveURL(/\/connexion$/);
   });
 
+  test("trouve les conditions et la politique de confidentialité depuis la connexion", async ({ page }) => {
+    await page.goto("/connexion");
+    await page.getByRole("link", { name: "conditions du pilote", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Conditions du pilote");
+    await page.goto("/connexion");
+    await page.getByRole("link", { name: "politique de confidentialité", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Politique de confidentialité");
+  });
+
   test("ne peut pas se connecter avec un mauvais code", async ({ page }) => {
     await requestCode(page, testEmail("mauvais-code"));
     await page.getByLabel("Code reçu par e-mail").fill("000000");

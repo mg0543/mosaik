@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { signOutAction } from "@/app/(site)/connexion/actions";
 import { MAX_ORDER_XOF, RATE_BAND_PCT } from "@/lib/policy";
 import { requireUser } from "@/server/auth";
@@ -31,6 +32,10 @@ export default async function AccountPage() {
           </ul>
         </div>
       </section>
+
+      <p className="field-hint">
+        <Link href="/conditions">Conditions du pilote</Link> · <Link href="/confidentialite">Confidentialité</Link>
+      </p>
 
       <form action={signOutAction}>
         <button type="submit" className="btn btn-secondary btn-block">Se déconnecter</button>

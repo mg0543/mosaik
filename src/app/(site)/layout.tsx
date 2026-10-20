@@ -31,7 +31,8 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
           appariements ; elle ne détient, ne transfère ni ne convertit aucun fonds.
         </p>
         <p>
-          <Link href="/simulateur">Simulateur</Link> · <Link href="/connexion">Connexion</Link>
+          <Link href="/simulateur">Simulateur</Link> · <Link href="/conditions">Conditions du pilote</Link> ·{" "}
+          <Link href="/confidentialite">Confidentialité</Link>
         </p>
       </footer>
     </>

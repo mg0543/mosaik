@@ -593,3 +593,50 @@ a {
 .status-page p {
   margin: 0 0 8px;
 }
+
+/* ---------- Pages juridiques ---------- */
+
+.legal {
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+.legal h1 {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  margin: 8px 0 16px;
+}
+
+.legal h2 {
+  font-size: 17px;
+  margin: 28px 0 8px;
+}
+
+.legal p,
+.legal li {
+  color: var(--text-2);
+}
+
+.legal ul {
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.legal strong {
+  color: var(--text);
+}
+
+.legal-meta {
+  margin-top: 32px;
+  font-size: 14px;
+}
+
+mark.todo {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px dashed var(--warn-border);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-weight: 500;
+}

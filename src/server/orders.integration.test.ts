@@ -142,6 +142,50 @@ describe("limites d'activité", () => {
   });
 });
 
+describe("intégrité imposée par la base", () => {
+  /** Un ordre servi en partie par un échange : la matière de tous les cas ci-dessous. */
+  async function partiallyFilled() {
+    const resting = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 656_000, limitRate: 656_000 });
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
+    return resting.orderId;
+  }
+
+  it("interdit de modifier ou supprimer un échange conclu", async () => {
+    await partiallyFilled();
+    await expect(sql`update public.trades set xof = xof + 1`).rejects.toThrow(/ni modifiés ni supprimés/);
+    await expect(sql`delete from public.trades`).rejects.toThrow(/ni modifiés ni supprimés/);
+    expect(await allTrades()).toHaveLength(1);
+  });
+
+  it("interdit de changer les caractéristiques d'un ordre", async () => {
+    const id = await partiallyFilled();
+    await expect(sql`update public.orders set amount = amount + 1 where id = ${id}`).rejects.toThrow(/caractéristiques/);
+    await expect(sql`update public.orders set limit_rate = 700000 where id = ${id}`).rejects.toThrow(/caractéristiques/);
+    await expect(sql`update public.orders set owner_id = ${users.bob} where id = ${id}`).rejects.toThrow(/caractéristiques/);
+  });
+
+  it("interdit d'augmenter le reste ou de supprimer un ordre", async () => {
+    const id = await partiallyFilled();
+    await expect(sql`update public.orders set remaining = remaining + 1 where id = ${id}`).rejects.toThrow(/que diminuer/);
+    await expect(sql`delete from public.orders where id = ${id}`).rejects.toThrow(/annulé/);
+  });
+
+  it("garde terminés les ordres servis ou annulés", async () => {
+    const id = await partiallyFilled();
+    expect(await cancelOrderForUser(sql, users.alice, id)).toBe(true);
+    await expect(sql`update public.orders set status = 'open' where id = ${id}`).rejects.toThrow(/ne peut plus être modifié/);
+    const [filled] = await sql<{ id: string }[]>`select id from public.orders where status = 'filled'`;
+    await expect(sql`update public.orders set status = 'open', remaining = 1 where id = ${filled.id}`).rejects.toThrow(
+      /ne peut plus être modifié/,
+    );
+  });
+
+  it("refuse un ordre dont le reste et le reste technique dépasseraient le montant", async () => {
+    const id = await partiallyFilled();
+    await expect(sql`update public.orders set leftover = amount where id = ${id}`).rejects.toThrow(/orders_accounting/);
+  });
+});
+
 describe("cancelOrderForUser", () => {
   it("annule son propre ordre ouvert, qui n'est plus apparié ensuite", async () => {
     const { orderId } = await placeOrderForUser(sql, {

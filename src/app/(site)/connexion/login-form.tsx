@@ -54,6 +54,10 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         {pending ? "Envoi…" : "Recevoir un code"}
       </button>
       <p className="field-hint">Pas de mot de passe : un code vous est envoyé à chaque connexion.</p>
+      <p className="field-hint">
+        En continuant, vous acceptez les <a href="/conditions">conditions du pilote</a> et la{" "}
+        <a href="/confidentialite">politique de confidentialité</a>.
+      </p>
     </form>
   );
 }
