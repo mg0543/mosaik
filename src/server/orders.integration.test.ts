@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { placeOrder, type Order, type Side } from "../lib/matching";
 import { createSql } from "./db";
 import { cancelOrderForUser, placeOrderForUser } from "./orders";
+import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders } from "./queries";
 
 // Base Supabase locale (`supabase start`) par défaut. Utilisateurs fictifs, adresses en .test.
 const url = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -119,6 +120,61 @@ describe("cancelOrderForUser", () => {
     await placeOrderForUser(sql, { userId: users.bob, side: "SELL_XOF", amount: 100_000, limitRate: 670_000 });
     expect(await allTrades()).toHaveLength(0);
     expect(await order(orderId)).toMatchObject({ status: "cancelled", remaining: 100_000 });
+  });
+});
+
+describe("requêtes des écrans", () => {
+  it("résume le marché : meilleurs taux et volumes de chaque côté", async () => {
+    expect(await getMarketSnapshot(sql)).toEqual({ bestEurOffer: null, eurAvailableCents: 0, bestXofOffer: null, xofAvailable: 0 });
+
+    await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 100_000, limitRate: 660_000 });
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 657_000 });
+    await placeOrderForUser(sql, { userId: users.chloe, side: "SELL_XOF", amount: 300_000, limitRate: 650_000 });
+
+    expect(await getMarketSnapshot(sql)).toEqual({
+      bestEurOffer: 657_000, eurAvailableCents: 150_000, bestXofOffer: 650_000, xofAvailable: 300_000,
+    });
+  });
+
+  it("marque les ordres de l'utilisateur dans le carnet sans révéler les autres", async () => {
+    await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 100_000, limitRate: 660_000 });
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_XOF", amount: 300_000, limitRate: 650_000 });
+
+    const book = await getBookForUser(sql, users.alice);
+    expect(book.map((b) => [b.side, b.isMine])).toEqual([["SELL_EUR", true], ["SELL_XOF", false]]);
+    expect(Object.keys(book[0]).sort()).toEqual(["isMine", "limitRate", "remaining", "seq", "side"]);
+  });
+
+  it("liste les ordres de l'utilisateur avec ce qu'il a donné et reçu", async () => {
+    const resting = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 656_000, limitRate: 656_000 });
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
+
+    const [order] = await getMyOrders(sql, users.alice);
+    expect(order).toMatchObject({
+      id: resting.orderId, status: "open", amount: 656_000, remaining: 328_000, given: 328_000, received: 50_000, tradeCount: 1,
+    });
+    expect(await getMyOrders(sql, users.chloe)).toEqual([]);
+  });
+
+  it("donne le détail d'un ordre à son seul propriétaire", async () => {
+    const resting = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 656_000, limitRate: 656_000 });
+    const incoming = await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
+
+    const mine = await getMyOrder(sql, users.alice, resting.orderId);
+    expect(mine?.trades).toEqual([expect.objectContaining({ eurCents: 50_000, xof: 328_000, rate: 656_000, role: "maker" })]);
+    expect((await getMyOrder(sql, users.bob, incoming.orderId))?.trades[0].role).toBe("taker");
+
+    // Les échanges d'une même transaction sont listés dans l'ordre d'exécution du moteur.
+    await placeOrderForUser(sql, { userId: users.chloe, side: "SELL_EUR", amount: 40_000, limitRate: 658_000 });
+    await placeOrderForUser(sql, { userId: users.dan, side: "SELL_EUR", amount: 80_000, limitRate: 656_000 });
+    const sweep = await placeOrderForUser(sql, { userId: users.bob, side: "SELL_XOF", amount: 1_000_000, limitRate: 670_000 });
+    const sweepTrades = (await getMyOrder(sql, users.bob, sweep.orderId))?.trades ?? [];
+    expect(sweepTrades.map((t) => t.rate)).toEqual(sweep.result.trades.map((t) => t.rate));
+    expect(sweepTrades.map((t) => t.rate)).toEqual([656_000, 658_000]);
+
+    // Jamais l'ordre d'un autre, même avec son identifiant ; un identifiant mal formé ne casse rien.
+    expect(await getMyOrder(sql, users.bob, resting.orderId)).toBeNull();
+    expect(await getMyOrder(sql, users.alice, "pas-un-uuid")).toBeNull();
   });
 });
 

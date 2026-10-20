@@ -8,22 +8,45 @@ Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 
 ## Ce qui est dans le projet
 
-- `src/lib/matching.ts` : le moteur de matching (fonction pure, sans effet de bord).
-  - matching fractionné : une demande est servie par plusieurs offres ;
-  - exécution partielle : une offre partiellement consommée garde son reste ;
-  - montants en entiers (centimes d'EUR, XOF) pour éviter les erreurs d'arrondi ;
-  - helpers : spread au taux de référence, commission dégressive.
-- `src/lib/matching.test.ts` : tests unitaires (Vitest).
-- `src/app/` : interface Next.js minimale pour simuler un matching sur des données fictives.
+- `src/lib/` : code pur et testé, partagé entre navigateur et serveur.
+  - `matching.ts` : moteur du carnet d'ordres (calcul exact en entiers) ;
+  - `policy.ts` : garde-fous du pilote (taux à ±15 % de la référence, 5 000 000 XOF max par ordre) ;
+  - `preview.ts`, `format.ts`, `order-status.ts` : aperçu, affichage, statuts.
+- `src/server/` : accès à la base et authentification, côté serveur uniquement.
+  - `orders.ts` : passage et annulation d'ordres dans une transaction sous verrou ;
+  - `queries.ts` : lectures des écrans, toujours filtrées sur l'utilisateur de la session.
+- `src/app/(site)/` : accueil, connexion (code à 6 chiffres + lien), simulateur.
+- `src/app/app/` : espace connecté (tableau de bord, échanger, mes ordres, compte).
+- `supabase/` : migrations SQL et modèle de l'e-mail de connexion.
+- `e2e/` : tests de bout en bout (Playwright, Chrome installé).
 
 ## Démarrer en local
 
-Prérequis : Node.js 20 ou plus récent.
+Prérequis : Node.js 20+, Docker Desktop démarré, CLI Supabase.
 
 ```bash
 npm install
-npm test        # lance les tests du moteur
-npm run dev     # http://localhost:3000
+npm run db:start   # Supabase local : PostgreSQL, Auth, boîte mail de test (http://127.0.0.1:54324)
+npm run dev        # http://localhost:3000
+```
+
+Créer `.env.local` à partir de `supabase status -o env` :
+
+```
+NEXT_PUBLIC_SUPABASE_URL=<API_URL>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY>
+DATABASE_URL=<DB_URL>
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+Les e-mails de connexion arrivent dans la boîte de test locale, rien n'est réellement envoyé.
+
+## Tests
+
+```bash
+npm test           # tests unitaires (moteur, garde-fous, affichage)
+npm run test:db    # intégration : base, sécurité, concurrence (Supabase local requis)
+npm run test:e2e   # bout en bout dans Chrome : connexion, échange, annulation, mobile
 ```
 
 ## Base de données (Supabase en local)
@@ -49,12 +72,21 @@ npm run db:reset   # recrée la base à partir des migrations
 2. VS Code propose d'installer les extensions recommandées (`.vscode/extensions.json`).
 3. La sauvegarde formate automatiquement le code (Prettier).
 
-## Déployer sur Vercel
+## Déployer
 
-1. Pousser le dépôt sur GitHub.
-2. Sur vercel.com : `Add New > Project`, importer le dépôt.
-3. Framework détecté automatiquement (Next.js). Aucune variable d'environnement n'est requise pour le prototype.
-4. `Deploy`.
+Le site est déployé sur Vercel à chaque push sur `main`. Sans base configurée, il affiche
+« pilote bientôt ouvert » et seul le simulateur fonctionne.
+
+Pour ouvrir le pilote :
+
+1. Créer un projet Supabase (région Europe), puis `supabase link` et `supabase db push`.
+2. Dans Supabase > Authentication :
+   - URL du site : l'adresse de production ; URL de redirection : `<adresse>/auth/confirm` ;
+   - modèles « Magic link » et « Confirm signup » : contenu de `supabase/templates/magic_link.html` ;
+   - SMTP : un fournisseur d'e-mails (celui de Supabase est limité à quelques envois par heure).
+3. Dans Vercel > Settings > Environment Variables : `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL` (pooler Supabase, mode transaction, port 6543)
+   et `NEXT_PUBLIC_SITE_URL`. Redéployer.
 
 ## Règles métier actuelles (à valider)
 

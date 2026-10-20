@@ -11,10 +11,10 @@ import {
   xofForEurCents,
   type Order,
   type PlaceOrderResult,
-  type RateMilli,
   type Side,
   type Trade,
 } from "@/lib/matching";
+import { averageRate, fmtEur, fmtGiven, fmtPct, fmtRate, fmtReceived, fmtXof, rateGap } from "@/lib/format";
 
 /** Identifiant de l'utilisateur du simulateur. */
 const ME = "vous";
@@ -33,30 +33,7 @@ const INITIAL_BOOK: Order[] = [
 
 const INITIAL_NEXT_SEQ = INITIAL_BOOK.length + 1;
 
-// ---------- Affichage uniquement (les décimales sont permises ici) ----------
-
-const fmtXof = (n: number) => `${n.toLocaleString("fr-FR")} XOF`;
-const fmtEur = (cents: number) =>
-  `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-const fmtRate = (rate: RateMilli) => (rate / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
-/** Montant dans la devise donnée par un ordre de ce côté. */
-const fmtGiven = (side: Side, n: number) => (side === "SELL_XOF" ? fmtXof(n) : fmtEur(n));
-/** Montant dans la devise reçue par un ordre de ce côté. */
-const fmtReceived = (side: Side, n: number) => (side === "SELL_XOF" ? fmtEur(n) : fmtXof(n));
 const sellerLabel = (ownerId: string) => (ownerId === ME ? "Vous" : `Vendeur ${ownerId.replace(/\D/g, "")}`);
-
-/** Part servie, arrondie à l'inférieur : on n'affiche jamais 100 % s'il reste un montant. */
-function fmtPct(part: number, total: number): string {
-  const pct = Math.floor((part / total) * 1000) / 10;
-  return `${pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
-}
-
-/** Écart d'un taux par rapport à la référence. */
-function rateGap(rate: RateMilli): string {
-  const pct = (rate / REFERENCE_RATE - 1) * 100;
-  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
-  return `${sign}${Math.abs(pct).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} % par rapport à la référence`;
-}
 
 /** Lecture d'une saisie : renvoie la valeur ou le message d'erreur. */
 function read<T>(parse: (s: string) => T, input: string): { ok: true; value: T } | { ok: false; error: string } {
@@ -306,9 +283,7 @@ function ResultView({ order, result }: { order: Order; result: PlaceOrderResult 
   // Part de chaque contrepartie, mesurée dans la devise que vous donnez.
   const share = (t: Trade) => (side === "SELL_XOF" ? t.xof : t.eurCents);
 
-  const xofTotal = trades.reduce((s, t) => s + t.xof, 0);
-  const centsTotal = trades.reduce((s, t) => s + t.eurCents, 0);
-  const avgRate = centsTotal > 0 ? Math.round((xofTotal * 100_000) / centsTotal) : 0;
+  const avgRate = averageRate(trades);
 
   return (
     <>

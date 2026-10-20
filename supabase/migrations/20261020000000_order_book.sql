@@ -46,6 +46,8 @@ create table public.trades (
   eur_cents bigint not null check (eur_cents > 0),
   xof bigint not null check (xof > 0),
   rate integer not null check (rate > 0),
+  -- Ordre d'exécution : les échanges d'une même transaction partagent la même date.
+  seq bigint generated always as identity unique,
   created_at timestamptz not null default now(),
   constraint trades_distinct_orders check (maker_order_id <> taker_order_id),
   constraint trades_no_self_trade check (maker_id <> taker_id),

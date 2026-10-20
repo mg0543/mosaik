@@ -25,6 +25,8 @@ npm-debug.log*
 
 # tests
 coverage/
+test-results/
+playwright-report/
 
 # editor (on garde les réglages partagés du projet)
 .idea/
