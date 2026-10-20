@@ -26,6 +26,23 @@ npm test        # lance les tests du moteur
 npm run dev     # http://localhost:3000
 ```
 
+## Base de données (Supabase en local)
+
+Prérequis : Docker Desktop démarré et le CLI Supabase.
+
+```bash
+npm run db:start   # PostgreSQL + Auth en local, applique les migrations
+npm run test:db    # tests d'intégration : matching transactionnel, sécurité, concurrence
+npm run db:reset   # recrée la base à partir des migrations
+```
+
+- Schéma : `supabase/migrations/`. Tables `orders` et `trades`, montants en `bigint`,
+  contraintes qui interdisent les états incohérents.
+- Écritures uniquement côté serveur (`src/server/orders.ts`), dans une transaction protégée
+  par un verrou du carnet : deux ordres ne peuvent jamais consommer la même contrepartie.
+- Les clients ne peuvent que lire leurs propres ordres et échanges (RLS) ; le carnet public
+  anonymisé est exposé par la fonction `order_book()`.
+
 ## Ouvrir dans VS Code
 
 1. `File > Open Folder` puis sélectionner ce dossier.

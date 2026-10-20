@@ -252,7 +252,8 @@ export function commissionPct(xofAmount: number): number {
   return 1;
 }
 
-function assertValidOrder(order: Order): void {
+/** Vérifie qu'un ordre est valide et appariable ; lève une RangeError sinon. */
+export function assertValidOrder(order: Order): void {
   assertPositiveInteger(order.remaining, order.side === "SELL_EUR" ? "Le montant en centimes" : "Le montant en XOF");
   assertPositiveInteger(order.limitRate, "Le taux limite");
   if (!Number.isSafeInteger(order.seq)) throw new RangeError("L'ordre d'arrivée doit être un entier.");

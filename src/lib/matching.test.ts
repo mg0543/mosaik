@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  assertValidOrder,
   commissionPct,
   eurCentsForXof,
   isMatchable,
@@ -315,6 +316,16 @@ describe("placeOrder : règles du carnet", () => {
     expect(() => placeOrder([], { ...valid, remaining: 5 })).toThrow(/trop faible/);
     // Identifiant déjà présent.
     expect(() => placeOrder([valid], valid)).toThrow(RangeError);
+  });
+});
+
+describe("assertValidOrder", () => {
+  it("accepte un ordre valide et refuse un ordre non appariable ou mal formé", () => {
+    const valid = sellXof("A", 100_000, "670", 10);
+    expect(() => assertValidOrder(valid)).not.toThrow();
+    expect(() => assertValidOrder({ ...valid, remaining: 5 })).toThrow(/trop faible/);
+    expect(() => assertValidOrder({ ...valid, ownerId: "" })).toThrow(RangeError);
+    expect(() => assertValidOrder({ ...valid, seq: 1.5 })).toThrow(RangeError);
   });
 });
 

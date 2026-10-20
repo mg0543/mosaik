@@ -7,11 +7,15 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "vitest run --config vitest.integration.config.mts",
+    "db:start": "supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,postgres-meta,supavisor",
+    "db:reset": "supabase db reset"
   },
   "license": "UNLICENSED",
   "dependencies": {
     "next": "^16.4.2",
+    "postgres": "^3.4.9",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
