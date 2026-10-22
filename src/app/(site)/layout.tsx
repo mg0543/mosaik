@@ -13,7 +13,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
         <div className="topbar-inner">
           <Link href="/" className="brand">
             <Logo />
-            Mosaik
+            MEYA
           </Link>
           <span className="tag">Pilote</span>
           <div className="ref-rate">
@@ -32,7 +32,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
       <main className="page">{children}</main>
       <footer className="site-footer">
         <p>
-          Mosaik est un pilote. La plateforme met des particuliers en relation et calcule les
+          MEYA est un pilote. La plateforme met des particuliers en relation et calcule les
           appariements ; elle ne détient, ne transfère ni ne convertit aucun fonds.
         </p>
         <p>

@@ -7,10 +7,10 @@ import "./app.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Mosaik · Échange EUR ↔ XOF entre particuliers", template: "%s · Mosaik" },
+  title: { default: "MEYA · Échange EUR ↔ XOF entre particuliers", template: "%s · MEYA" },
   description: "Échangez vos euros et vos francs CFA avec d'autres particuliers, chacun à son prix. Pilote.",
-  applicationName: "Mosaik",
-  appleWebApp: { capable: true, title: "Mosaik", statusBarStyle: "default" },
+  applicationName: "MEYA",
+  appleWebApp: { capable: true, title: "MEYA", statusBarStyle: "default" },
   formatDetection: { telephone: false },
 };
 

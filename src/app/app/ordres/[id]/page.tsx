@@ -113,7 +113,7 @@ export default async function OrderPage({
 
       <p className="field-hint">
         Chaque échange se règle directement entre les deux participants : celui dont l&apos;ordre est arrivé en
-        dernier envoie sa part en premier. Mosaik ne reçoit ni ne transfère aucun argent.
+        dernier envoie sa part en premier. MEYA ne reçoit ni ne transfère aucun argent.
       </p>
     </div>
   );

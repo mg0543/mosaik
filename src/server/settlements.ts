@@ -4,7 +4,7 @@ import type { Queryable, Sql } from "./db";
 
 /**
  * Coordonnées de réception et suivi du règlement entre participants.
- * Mosaik ne déplace aucun argent : ce module enregistre où chacun doit payer et ce que
+ * MEYA ne déplace aucun argent : ce module enregistre où chacun doit payer et ce que
  * chacun déclare avoir envoyé ou reçu. Toutes les écritures vérifient l'identité de
  * l'utilisateur dans la requête elle-même (clause WHERE), jamais après coup.
  */

@@ -15,8 +15,8 @@ export function siteUrl(): string {
 
 /**
  * Pilote sur invitation : seules les adresses invitées peuvent créer un compte.
- * Activé par défaut ; MOSAIK_INVITE_ONLY=false ouvre l'inscription à tous.
+ * Activé par défaut ; MEYA_INVITE_ONLY=false ouvre l'inscription à tous.
  */
 export function isInviteOnly(): boolean {
-  return process.env.MOSAIK_INVITE_ONLY !== "false";
+  return process.env.MEYA_INVITE_ONLY !== "false";
 }

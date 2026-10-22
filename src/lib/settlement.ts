@@ -1,5 +1,5 @@
 /**
- * Protocole de règlement entre participants (Mosaik ne touche jamais l'argent).
+ * Protocole de règlement entre participants (MEYA ne touche jamais l'argent).
  * Ordre imposé, pour qu'un seul participant soit exposé à la fois :
  *   1. le preneur envoie sa part          (taker_sent)
  *   2. le faiseur confirme la réception   (maker_received)

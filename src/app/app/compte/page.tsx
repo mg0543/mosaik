@@ -49,7 +49,7 @@ export default async function AccountPage() {
             <li>Montant maximal par ordre : {MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF ou l&apos;équivalent en euros.</li>
             <li>Au plus {MAX_OPEN_ORDERS} ordres en attente à la fois.</li>
             <li>Taux limite compris à ±{RATE_BAND_PCT} % du taux de référence, pour éviter les fautes de frappe.</li>
-            <li>Vous payez et êtes payé directement par vos contreparties ; aucun argent ne transite par Mosaik.</li>
+            <li>Vous payez et êtes payé directement par vos contreparties ; aucun argent ne transite par MEYA.</li>
           </ul>
         </div>
       </section>

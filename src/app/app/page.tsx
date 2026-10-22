@@ -89,7 +89,7 @@ export default async function DashboardPage() {
         {recent.length === 0 ? (
           <div className="empty-state card">
             <p>Vous n&apos;avez encore passé aucun ordre.</p>
-            <p className="muted">Choisissez un montant et votre taux : Mosaik cherche les contreparties pour vous.</p>
+            <p className="muted">Choisissez un montant et votre taux : MEYA cherche les contreparties pour vous.</p>
           </div>
         ) : (
           <ul className="order-list">

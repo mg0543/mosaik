@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <div className="app-header-inner">
           <Link href="/app" className="brand">
             <Logo size={24} />
-            Mosaik
+            MEYA
           </Link>
           <span className="tag">Pilote</span>
           <AppNav variant="top" />

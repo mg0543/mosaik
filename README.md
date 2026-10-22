@@ -1,4 +1,7 @@
-# Mosaik (prototype)
+# MEYA (prototype)
+
+> Anciennement « Mosaik ». Les noms d'infrastructure (dépôt `mosaik`, projet Supabase `mosaik`,
+> adresse `mosaik-ten.vercel.app`) n'ont pas encore été renommés.
 
 Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 
@@ -106,7 +109,7 @@ Pour ouvrir le pilote :
 
 ## Inviter un participant au pilote
 
-Par défaut, seules les adresses invitées peuvent créer un compte. `MOSAIK_INVITE_ONLY=false`
+Par défaut, seules les adresses invitées peuvent créer un compte. `MEYA_INVITE_ONLY=false`
 ouvre l'inscription à tous : **c'est le réglage actuel de la production** (variable Vercel).
 Pour revenir à l'invitation, supprimer cette variable dans Vercel puis redéployer.
 Dans Supabase > SQL Editor :
@@ -117,7 +120,7 @@ insert into public.pilot_invites (email, note) values ('prenom.nom@exemple.com',
 
 ## Règlement entre participants (pilote)
 
-Mosaik ne reçoit, ne détient ni ne transfère aucun fonds. Chaque échange se règle directement :
+MEYA ne reçoit, ne détient ni ne transfère aucun fonds. Chaque échange se règle directement :
 
 1. le preneur (ordre arrivé en dernier) envoie sa part sur les coordonnées du faiseur et le confirme ;
 2. le faiseur confirme la réception, envoie sa part et le confirme ;

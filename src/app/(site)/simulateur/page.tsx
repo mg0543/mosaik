@@ -1,6 +1,6 @@
 import { Simulator } from "./simulator";
 
-export const metadata = { title: "Simulateur · Mosaik" };
+export const metadata = { title: "Simulateur · MEYA" };
 
 export default function SimulatorPage() {
   return (

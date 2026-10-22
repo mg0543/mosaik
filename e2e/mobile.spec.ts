@@ -19,7 +19,7 @@ test("sur mobile, la barre d'onglets remplace la navigation et rien ne déborde"
 
 test("l'application est installable : manifeste et icônes valides", async ({ request }) => {
   const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest).toMatchObject({ short_name: "Mosaik", display: "standalone", start_url: "/app" });
+  expect(manifest).toMatchObject({ short_name: "MEYA", display: "standalone", start_url: "/app" });
   for (const icon of manifest.icons) {
     const response = await request.get(icon.src);
     expect(response.status(), icon.src).toBe(200);

@@ -13,14 +13,14 @@ export default function TermsPage() {
 
       <h2>1. Objet</h2>
       <p>
-        Mosaik est un service en phase pilote, édité par <Todo>nom ou raison sociale de l&apos;éditeur</Todo>.
+        MEYA est un service en phase pilote, édité par <Todo>nom ou raison sociale de l&apos;éditeur</Todo>.
         Il permet à des particuliers de passer des ordres d&apos;échange entre euros et francs CFA (XOF) et
         calcule comment ces ordres se répondent.
       </p>
 
-      <h2>2. Ce que Mosaik ne fait pas</h2>
+      <h2>2. Ce que MEYA ne fait pas</h2>
       <p>
-        Pendant le pilote, Mosaik ne reçoit, ne détient, ne transfère ni ne convertit aucun fonds. Mosaik
+        Pendant le pilote, MEYA ne reçoit, ne détient, ne transfère ni ne convertit aucun fonds. MEYA
         n&apos;intervient dans aucun paiement entre participants.
       </p>
 
@@ -43,7 +43,7 @@ export default function TermsPage() {
           Les montants sont calculés en centimes et en XOF entiers, arrondis à l&apos;inférieur. Un reste de
           moins d&apos;un centime, qui ne peut pas être échangé, vous est toujours indiqué.
         </li>
-        <li>Un échange enregistré ne peut plus être modifié ni annulé dans Mosaik.</li>
+        <li>Un échange enregistré ne peut plus être modifié ni annulé dans MEYA.</li>
       </ul>
 
       <h2>4. Limites du pilote</h2>
@@ -56,12 +56,12 @@ export default function TermsPage() {
       <h2>5. Règlement entre participants</h2>
       <p>
         Chaque échange se règle directement entre les deux participants, sans que l&apos;argent transite
-        par Mosaik :
+        par MEYA :
       </p>
       <ol>
         <li>
           le participant dont l&apos;ordre est arrivé en dernier envoie sa part en premier, sur les
-          coordonnées indiquées par Mosaik, et le confirme ;
+          coordonnées indiquées par MEYA, et le confirme ;
         </li>
         <li>l&apos;autre participant vérifie la réception, le confirme, puis envoie sa part et le confirme ;</li>
         <li>le premier confirme la réception : l&apos;échange est réglé.</li>
@@ -69,16 +69,16 @@ export default function TermsPage() {
       <p>
         Le règlement doit être fait dans les 24 heures suivant l&apos;échange. Chaque participant peut
         signaler un problème à tout moment avant la fin du règlement ; le règlement est alors gelé.
-        Mosaik ne garantit pas le paiement par la contrepartie et ne peut pas annuler un paiement effectué.
+        MEYA ne garantit pas le paiement par la contrepartie et ne peut pas annuler un paiement effectué.
         Pour passer un ordre, vous devez renseigner les coordonnées où vous souhaitez être payé.{" "}
         <Todo>traitement des litiges, des retards et conséquences pour le participant défaillant</Todo>
       </p>
 
       <h2>6. Vos engagements</h2>
       <ul>
-        <li>Utiliser Mosaik à titre personnel, avec un seul compte, et à partir de fonds dont l&apos;origine est licite.</li>
+        <li>Utiliser MEYA à titre personnel, avec un seul compte, et à partir de fonds dont l&apos;origine est licite.</li>
         <li>
-          Ne pas utiliser Mosaik pour blanchir de l&apos;argent, financer une activité illégale, frauder ou
+          Ne pas utiliser MEYA pour blanchir de l&apos;argent, financer une activité illégale, frauder ou
           contourner une réglementation des changes.
         </li>
         <li>Ne pas perturber le service ni tenter d&apos;accéder aux données d&apos;autres participants.</li>

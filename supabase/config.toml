@@ -238,12 +238,12 @@ otp_expiry = 900
 
 # Code à 6 chiffres envoyé pour « Mot de passe oublié ».
 [auth.email.template.magic_link]
-subject = "Votre code Mosaik"
+subject = "Votre code MEYA"
 content_path = "./supabase/templates/magic_link.html"
 
 # Confirmation de l'adresse e-mail à l'inscription.
 [auth.email.template.confirmation]
-subject = "Confirmez votre adresse e-mail Mosaik"
+subject = "Confirmez votre adresse e-mail MEYA"
 content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template

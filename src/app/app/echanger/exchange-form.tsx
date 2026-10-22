@@ -111,7 +111,7 @@ export function ExchangeForm({ book, canReceive }: { book: PublicBookEntry[]; ca
       <p className="field-hint center">
         L&apos;exécution a lieu au moment de la confirmation, au meilleur des offres disponibles à cet
         instant, jamais au-delà de votre taux. Vous réglez ensuite chaque échange directement avec votre
-        contrepartie, dans les 24 heures ; aucun argent ne transite par Mosaik.
+        contrepartie, dans les 24 heures ; aucun argent ne transite par MEYA.
       </p>
     </form>
   );

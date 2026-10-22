@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 
-/** Manifeste PWA : rend Mosaik installable sur l'écran d'accueil du téléphone. */
+/** Manifeste PWA : rend MEYA installable sur l'écran d'accueil du téléphone. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mosaik · Échange EUR ↔ XOF",
-    short_name: "Mosaik",
+    name: "MEYA · Échange EUR ↔ XOF",
+    short_name: "MEYA",
     description: "Échangez vos euros et vos francs CFA entre particuliers, chacun à son prix.",
     lang: "fr",
     start_url: "/app",

@@ -44,7 +44,7 @@ export async function codeFromEmail(email: string): Promise<string> {
 }
 
 /** Mot de passe des comptes de test (respecte les règles : 10 caractères, lettres et chiffres). */
-export const TEST_PASSWORD = "mosaik2026test";
+export const TEST_PASSWORD = "meya2026test";
 
 export interface TestAccount {
   email: string;

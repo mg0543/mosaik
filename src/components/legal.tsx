@@ -11,7 +11,7 @@ export function DraftNotice() {
     <div className="notice warn" role="note">
       <div>
         <strong>Version provisoire.</strong> Ce document décrit fidèlement le fonctionnement actuel de
-        Mosaik ; il doit être complété et validé par un juriste avant l&apos;ouverture du pilote.
+        MEYA ; il doit être complété et validé par un juriste avant l&apos;ouverture du pilote.
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore, useState } from "react";
 
-const DISMISS_KEY = "mosaik:install-hint-dismissed";
+const DISMISS_KEY = "meya:install-hint-dismissed";
 
 /** Sur iPhone, Safari n'affiche pas de bouton d'installation : on explique la marche à suivre. */
 function shouldShow(): boolean {
@@ -36,7 +36,7 @@ export function InstallHint() {
   return (
     <div className="notice info install-hint" role="note">
       <div>
-        <strong>Installer Mosaik sur votre iPhone :</strong> touchez le bouton Partager de Safari,
+        <strong>Installer MEYA sur votre iPhone :</strong> touchez le bouton Partager de Safari,
         puis « Sur l&apos;écran d&apos;accueil ».
       </div>
       <button type="button" className="link-btn" onClick={dismiss}>Fermer</button>

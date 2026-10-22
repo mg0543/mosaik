@@ -130,7 +130,7 @@ function StepForm({
             <div><dt>Titulaire</dt><dd>{payTo.holder}</dd></div>
           </dl>
           <p className="field-hint">
-            Avant le <LocalDate date={dueAt} />. N&apos;envoyez qu&apos;à ces coordonnées : Mosaik ne vous demandera
+            Avant le <LocalDate date={dueAt} />. N&apos;envoyez qu&apos;à ces coordonnées : MEYA ne vous demandera
             jamais d&apos;en utiliser d&apos;autres.
           </p>
         </>

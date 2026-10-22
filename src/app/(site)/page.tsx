@@ -25,7 +25,7 @@ export default async function HomePage() {
       <section className="hero-block">
         <h1>Échangez vos euros et vos francs CFA entre particuliers.</h1>
         <p className="lead">
-          Vous fixez votre taux. Mosaik trouve une ou plusieurs personnes qui font l&apos;échange
+          Vous fixez votre taux. MEYA trouve une ou plusieurs personnes qui font l&apos;échange
           inverse, et vous n&apos;obtenez jamais moins bien que le taux que vous avez choisi.
         </p>
         <div className="cta-row">
@@ -67,12 +67,12 @@ export default async function HomePage() {
             limite : le minimum que vous acceptez, ou le maximum que vous êtes prêt à donner.
           </li>
           <li>
-            <strong>Mosaik l&apos;apparie.</strong> Votre ordre est servi par une ou plusieurs
+            <strong>MEYA l&apos;apparie.</strong> Votre ordre est servi par une ou plusieurs
             personnes, les meilleurs taux d&apos;abord. Ce qui n&apos;est pas servi attend dans le
             carnet à votre taux.
           </li>
           <li>
-            <strong>Vous réglez directement.</strong> Pour chaque échange, Mosaik vous indique combien
+            <strong>Vous réglez directement.</strong> Pour chaque échange, MEYA vous indique combien
             envoyer et à qui. Celui dont l&apos;ordre est arrivé en dernier paie en premier ; chacun
             confirme l&apos;envoi puis la réception, dans les 24 heures.
           </li>
@@ -84,7 +84,7 @@ export default async function HomePage() {
         <ul className="pledges">
           <li><strong>Jamais au-delà de votre taux.</strong> Chaque échange se fait au taux affiché ou mieux pour vous.</li>
           <li><strong>Calcul exact.</strong> Montants en centimes et en XOF entiers ; l&apos;écart d&apos;arrondi reste inférieur à 1 XOF par échange, et tout reste est affiché.</li>
-          <li><strong>Pas de fonds détenus.</strong> Pendant le pilote, Mosaik ne reçoit ni ne transfère d&apos;argent.</li>
+          <li><strong>Pas de fonds détenus.</strong> Pendant le pilote, MEYA ne reçoit ni ne transfère d&apos;argent.</li>
           <li>
             <strong>Discrétion.</strong> Votre adresse e-mail n&apos;est jamais affichée ; vos coordonnées de
             paiement ne sont transmises qu&apos;à vos contreparties, pour l&apos;échange concerné.
