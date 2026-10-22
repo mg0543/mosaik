@@ -557,20 +557,6 @@ a {
   flex-wrap: wrap;
 }
 
-/* Échanger */
-.exchange {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.exchange .segmented {
-  margin-bottom: 0;
-}
-
-.preview .hero {
-  margin-bottom: 4px;
-}
 
 /* ---------- États : introuvable, erreur ---------- */
 

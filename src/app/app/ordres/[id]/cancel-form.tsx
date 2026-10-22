@@ -10,7 +10,7 @@ export function CancelForm({ orderId, remainingLabel }: { orderId: string; remai
   if (!confirming) {
     return (
       <button type="button" className="btn btn-secondary btn-block" onClick={() => setConfirming(true)}>
-        Annuler l&apos;ordre
+        Annuler la partie en attente
       </button>
     );
   }
@@ -19,8 +19,8 @@ export function CancelForm({ orderId, remainingLabel }: { orderId: string; remai
     <form action={action} className="confirm-box">
       <input type="hidden" name="orderId" value={orderId} />
       <p style={{ margin: 0 }}>
-        Annuler l&apos;ordre ? Les <strong>{remainingLabel}</strong> non échangés sortent du carnet. Les
-        échanges déjà faits restent valables.
+        Annuler la partie en attente ? Les <strong>{remainingLabel}</strong> qui n&apos;ont pas encore trouvé de
+        partenaire ne seront plus proposés. Les échanges déjà conclus restent valables.
       </p>
       {state.error && <p className="error" role="alert">{state.error}</p>}
       <div className="confirm-actions">
@@ -28,7 +28,7 @@ export function CancelForm({ orderId, remainingLabel }: { orderId: string; remai
           {pending ? "Annulation…" : "Oui, annuler"}
         </button>
         <button type="button" className="btn btn-secondary" onClick={() => setConfirming(false)} disabled={pending}>
-          Garder l&apos;ordre
+          Garder ma demande
         </button>
       </div>
     </form>

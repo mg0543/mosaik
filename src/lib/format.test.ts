@@ -3,11 +3,13 @@ import {
   averageRate,
   fmtDate,
   fmtEur,
+  fmtEurNumber,
   fmtGiven,
   fmtPct,
   fmtRate,
   fmtReceived,
   fmtXof,
+  fmtXofNumber,
   rateGap,
   sideLabel,
 } from "./format";
@@ -20,6 +22,11 @@ describe("mise en forme", () => {
     expect(plain(fmtXof(1_000_000))).toBe("1 000 000 XOF");
     expect(plain(fmtEur(152_449))).toBe("1 524,49 €");
     expect(plain(fmtEur(5))).toBe("0,05 €");
+  });
+
+  it("formate un montant sans unité pour les champs du convertisseur", () => {
+    expect(plain(fmtEurNumber(50_000))).toBe("500,00");
+    expect(plain(fmtXofNumber(327_978))).toBe("327 978");
   });
 
   it("formate un taux en millièmes", () => {
@@ -49,11 +56,13 @@ describe("mise en forme", () => {
   it("calcule le taux moyen d'échanges", () => {
     expect(averageRate([{ eurCents: 100_000, xof: 655_000 }, { eurCents: 100_000, xof: 657_000 }])).toBe(656_000);
     expect(averageRate([])).toBe(0);
+    // 30 441 centimes contre 199 997 XOF à 657 : affiché 657 et non 656,999.
+    expect(averageRate([{ eurCents: 30_441, xof: 199_997 }])).toBe(657_000);
   });
 
   it("libelle le sens et la date", () => {
-    expect(sideLabel("SELL_XOF")).toBe("XOF → EUR");
-    expect(sideLabel("SELL_EUR")).toBe("EUR → XOF");
+    expect(sideLabel("SELL_XOF")).toBe("Francs CFA → Euros");
+    expect(sideLabel("SELL_EUR")).toBe("Euros → Francs CFA");
     expect(plain(fmtDate(new Date("2026-10-20T14:05:00Z")))).toBe("20 oct. 2026, 14:05");
     expect(plain(fmtDate(new Date("2026-10-20T14:05:00Z"), "Europe/Paris"))).toBe("20 oct. 2026, 16:05");
   });

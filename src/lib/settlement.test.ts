@@ -58,7 +58,7 @@ describe("protocole de règlement", () => {
 
   it("libelle les étapes selon celui qui regarde", () => {
     expect(stepLabel("taker_sent", "taker")).toBe("Vous envoyez votre part");
-    expect(stepLabel("taker_sent", "maker")).toBe("La contrepartie envoie sa part");
+    expect(stepLabel("taker_sent", "maker")).toBe("Votre partenaire envoie sa part");
     expect(stepLabel("maker_received", "maker")).toBe("Vous confirmez la réception");
     expect(stepButton("maker_sent")).toBe("J'ai envoyé l'argent");
     expect(stepButton("taker_received")).toBe("J'ai bien reçu l'argent");

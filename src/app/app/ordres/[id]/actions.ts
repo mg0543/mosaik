@@ -21,7 +21,7 @@ export async function cancelOrderAction(_prev: CancelState, formData: FormData):
     console.error("Annulation impossible", error);
     return { error: "L'annulation a échoué. Réessayez dans un instant." };
   }
-  if (!cancelled) return { error: "Cet ordre ne peut plus être annulé : il a peut-être été servi entre-temps." };
+  if (!cancelled) return { error: "Cette demande ne peut plus être annulée : elle a peut-être été servie entre-temps." };
   revalidatePath(`/app/ordres/${orderId}`);
   revalidatePath("/app/ordres");
   return {};

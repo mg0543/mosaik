@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProgressBar, StatusChip } from "@/components/orders";
 import { LocalDate } from "@/components/local-date";
-import { averageRate, fmtEur, fmtGiven, fmtPct, fmtRate, fmtReceived, fmtXof, sideLabel } from "@/lib/format";
+import { ProgressBar, StatusChip } from "@/components/orders";
+import { averageRate, fmtEur, fmtGiven, fmtRate, fmtReceived, fmtXof, sideLabel } from "@/lib/format";
+import { actionFor } from "@/lib/settlement";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
 import { getMyOrder } from "@/server/queries";
-import { actionFor } from "@/lib/settlement";
 import { CancelForm } from "./cancel-form";
 import { SettlementCard } from "./settlement-card";
 
-export const metadata: Metadata = { title: "Détail de l'ordre" };
+export const metadata: Metadata = { title: "Détail de l'échange" };
 
 export default async function OrderPage({
   params,
@@ -31,26 +31,28 @@ export default async function OrderPage({
 
   return (
     <div className="app-page">
-      <Link href="/app/ordres" className="back-link">← Mes ordres</Link>
+      <Link href="/app/ordres" className="back-link">← Mes échanges</Link>
 
       {nouveau && (
         <div className="notice success" role="status">
           <div>
-            <strong>Ordre enregistré.</strong>{" "}
+            <strong>Échange enregistré.</strong>{" "}
             {trades.length > 0
-              ? `Servi tout de suite par ${trades.length} contrepartie${trades.length > 1 ? "s" : ""}.`
-              : "Il attend dans le carnet qu'une contrepartie le croise."}
+              ? `${trades.length} partenaire${trades.length > 1 ? "s ont" : " a"} été trouvé${trades.length > 1 ? "s" : ""} tout de suite.`
+              : "Votre demande est publiée : elle sera servie dès qu'un partenaire correspond."}
+            {trades.length > 0 && order.remaining > 0 && " Le reste attend un autre partenaire."}
           </div>
         </div>
       )}
 
       {toDo > 0 && (
-        <div className="notice warn" role="status">
-          <div>
-            <strong>Action requise :</strong> {toDo} règlement{toDo > 1 ? "s attendent" : " attend"} une action de
-            votre part. <a href="#echanges">Y aller</a>
-          </div>
-        </div>
+        <a href="#echanges" className="action-banner">
+          <span className="action-dot" aria-hidden="true" />
+          <span>
+            <strong>À vous de jouer :</strong> {toDo} paiement{toDo > 1 ? "s attendent" : " attend"} votre action.
+          </span>
+          <span aria-hidden="true">↓</span>
+        </a>
       )}
 
       <section className="card">
@@ -59,18 +61,32 @@ export default async function OrderPage({
             <span className="order-side">{sideLabel(order.side)}</span>
             <StatusChip order={order} />
           </div>
-          <div className="detail-amount num">{fmtGiven(order.side, order.amount)}</div>
+          <div className="detail-flow">
+            <div>
+              <span className="detail-label">Vous envoyez</span>
+              <span className="detail-amount num">{fmtGiven(order.side, order.amount)}</span>
+            </div>
+            <span className="detail-arrow" aria-hidden="true">→</span>
+            <div>
+              <span className="detail-label">Reçu à ce jour</span>
+              <span className="detail-amount num">{fmtReceived(order.side, order.received)}</span>
+            </div>
+          </div>
           <ProgressBar order={order} />
           <dl className="facts">
-            <div><dt>Échangé</dt><dd className="num">{fmtGiven(order.side, order.given)} ({fmtPct(order.given, order.amount)})</dd></div>
-            <div><dt>Reçu</dt><dd className="num">{fmtReceived(order.side, order.received)}</dd></div>
-            {trades.length > 0 && <div><dt>Taux moyen obtenu</dt><dd className="num">{fmtRate(averageRate(trades))} XOF / €</dd></div>}
-            <div><dt>{sellXof ? "Taux maximum" : "Taux minimum"}</dt><dd className="num">{fmtRate(order.limitRate)} XOF / €</dd></div>
-            {order.status === "open" && <div><dt>En attente</dt><dd className="num">{fmtGiven(order.side, order.remaining)}</dd></div>}
+            <div><dt>Déjà échangé</dt><dd className="num">{fmtGiven(order.side, order.given)}</dd></div>
+            {order.status === "open" && (
+              <div><dt>En attente d&apos;un partenaire</dt><dd className="num">{fmtGiven(order.side, order.remaining)}</dd></div>
+            )}
             {order.status === "cancelled" && order.remaining > 0 && (
               <div><dt>Non échangé (annulé)</dt><dd className="num">{fmtGiven(order.side, order.remaining)}</dd></div>
             )}
-            <div><dt>Passé le</dt><dd><LocalDate date={order.createdAt} /></dd></div>
+            {trades.length > 0 && <div><dt>Taux obtenu</dt><dd className="num">1 € = {fmtRate(averageRate(trades))} XOF</dd></div>}
+            <div>
+              <dt>{sellXof ? "Taux accepté au plus" : "Taux accepté au moins"}</dt>
+              <dd className="num">1 € = {fmtRate(order.limitRate)} XOF</dd>
+            </div>
+            <div><dt>Créé le</dt><dd><LocalDate date={order.createdAt} /></dd></div>
           </dl>
           {order.leftover > 0 && (
             <p className="warn-text">
@@ -82,9 +98,15 @@ export default async function OrderPage({
       </section>
 
       <section aria-labelledby="trades-title" id="echanges" className="anchor-target">
-        <h2 id="trades-title" className="section-title">Échanges ({trades.length})</h2>
+        <h2 id="trades-title" className="section-title">Vos partenaires ({trades.length})</h2>
         {trades.length === 0 ? (
-          <p className="muted">Aucun échange pour l&apos;instant.</p>
+          <div className="empty-state card">
+            <p><strong>Pas encore de partenaire.</strong></p>
+            <p className="muted">
+              Votre demande est visible par les autres participants. Dès que quelqu&apos;un accepte votre taux, il
+              apparaîtra ici avec les instructions de paiement.
+            </p>
+          </div>
         ) : (
           <ul className="trade-list">
             {trades.map((t, i) =>
@@ -94,14 +116,13 @@ export default async function OrderPage({
               ) : (
                 <li key={t.id} className="card trade-item">
                   <div className="trade-head">
-                    <span>Contrepartie {i + 1}</span>
+                    <span>Partenaire {i + 1}</span>
                     <span className="muted"><LocalDate date={t.createdAt} /></span>
                   </div>
                   <div className="trade-amounts num">
-                    <span>Donné : {sellXof ? fmtXof(t.xof) : fmtEur(t.eurCents)}</span>
+                    <span>Envoyé : {sellXof ? fmtXof(t.xof) : fmtEur(t.eurCents)}</span>
                     <span>Reçu : {sellXof ? fmtEur(t.eurCents) : fmtXof(t.xof)}</span>
                   </div>
-                  <div className="muted trade-rate">Taux {fmtRate(t.rate)}</div>
                 </li>
               ),
             )}
@@ -112,8 +133,8 @@ export default async function OrderPage({
       {order.status === "open" && <CancelForm orderId={order.id} remainingLabel={fmtGiven(order.side, order.remaining)} />}
 
       <p className="field-hint">
-        Chaque échange se règle directement entre les deux participants : celui dont l&apos;ordre est arrivé en
-        dernier envoie sa part en premier. MEYA ne reçoit ni ne transfère aucun argent.
+        Chaque échange se règle directement entre les deux partenaires : celui qui a accepté l&apos;offre paie en
+        premier. MEYA ne reçoit ni ne transfère aucun argent.
       </p>
     </div>
   );

@@ -42,6 +42,14 @@ export interface BookEntry {
   isMine: boolean;
 }
 
+/** Offres en attente pour un visiteur non connecté : aucune n'est « à lui ». */
+export async function getPublicBook(sql: Sql): Promise<BookEntry[]> {
+  const rows = await sql<{ side: Side; remaining: number; limit_rate: number; seq: number }[]>`
+    select side, remaining, limit_rate, seq from public.orders where status = 'open' order by seq
+  `;
+  return rows.map((r) => ({ side: r.side, remaining: r.remaining, limitRate: r.limit_rate, seq: r.seq, isMine: false }));
+}
+
 export async function getBookForUser(sql: Sql, userId: string): Promise<BookEntry[]> {
   const rows = await sql<{ side: Side; remaining: number; limit_rate: number; seq: number; is_mine: boolean }[]>`
     select side, remaining, limit_rate, seq, owner_id = ${userId} as is_mine

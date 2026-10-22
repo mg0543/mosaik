@@ -14,6 +14,16 @@ export function fmtEur(cents: number): string {
   return `${(cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
+/** Montant en euros sans unité : 1 524,49 (pour un champ accompagné de « EUR »). */
+export function fmtEurNumber(cents: number): string {
+  return (cents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Montant en XOF sans unité : 1 000 000. */
+export function fmtXofNumber(xof: number): string {
+  return xof.toLocaleString("fr-FR");
+}
+
 /** 655,957 à partir de millièmes. */
 export function fmtRate(rate: RateMilli): string {
   return (rate / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
@@ -43,16 +53,19 @@ export function rateGap(rate: RateMilli): string {
   return `${sign}${Math.abs(pct).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} % par rapport à la référence`;
 }
 
-/** Taux moyen d'un ensemble d'échanges, en millièmes (arrondi au plus proche, affichage seul). */
+/**
+ * Taux moyen d'un ensemble d'échanges, en millièmes, arrondi au centième de XOF (affichage seul).
+ * L'arrondi au XOF inférieur de chaque échange ferait sinon afficher « 656,999 » pour une offre à 657.
+ */
 export function averageRate(trades: readonly { eurCents: number; xof: number }[]): RateMilli {
   const cents = trades.reduce((s, t) => s + t.eurCents, 0);
   const xof = trades.reduce((s, t) => s + t.xof, 0);
-  return cents > 0 ? Math.round((xof * 100_000) / cents) : 0;
+  return cents > 0 ? Math.round((xof * 100_000) / cents / 10) * 10 : 0;
 }
 
 /** Libellé du sens d'un ordre, du point de vue de son auteur. */
 export function sideLabel(side: Side): string {
-  return side === "SELL_XOF" ? "XOF → EUR" : "EUR → XOF";
+  return side === "SELL_XOF" ? "Francs CFA → Euros" : "Euros → Francs CFA";
 }
 
 /** Date courte : « 20 oct. 2026, 14:05 », dans le fuseau donné (UTC par défaut). */

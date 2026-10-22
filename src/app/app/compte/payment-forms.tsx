@@ -16,7 +16,7 @@ export function PaymentForms({ details }: { details: PaymentDetails }) {
           <div>
             <h2 id="eur-title" className="details-title">Pour recevoir des euros</h2>
             <p className="field-hint" style={{ margin: 0 }}>
-              {details.eurIban ? "Renseigné." : "Nécessaire pour passer un ordre XOF → EUR."}
+              {details.eurIban ? "Renseigné." : "Nécessaire pour recevoir des euros."}
             </p>
           </div>
           <label className="field">
@@ -44,7 +44,7 @@ export function PaymentForms({ details }: { details: PaymentDetails }) {
           <div>
             <h2 id="xof-title" className="details-title">Pour recevoir des XOF</h2>
             <p className="field-hint" style={{ margin: 0 }}>
-              {details.xofPhone ? "Renseigné." : "Nécessaire pour passer un ordre EUR → XOF."}
+              {details.xofPhone ? "Renseigné." : "Nécessaire pour recevoir des francs CFA."}
             </p>
           </div>
           <label className="field">

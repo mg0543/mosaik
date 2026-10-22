@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { placeOrder, type Order, type Side } from "../lib/matching";
 import { createSql } from "./db";
 import { cancelOrderForUser, placeOrderForUser } from "./orders";
-import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders } from "./queries";
+import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders, getPublicBook } from "./queries";
 import { canSignIn, inviteToPilot } from "./invites";
 import { getProfile } from "./profiles";
 import { confirmSettlementStep, getPendingActions, openDispute, saveEurDetails, saveXofDetails } from "./settlements";
@@ -124,7 +124,7 @@ describe("limites d'activité", () => {
     }
     await expect(
       placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 }),
-    ).rejects.toThrow(/10 ordres en attente/);
+    ).rejects.toThrow(/10 demandes en attente/);
     // Les autres utilisateurs ne sont pas concernés.
     await expect(
       placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 }),
@@ -442,6 +442,12 @@ describe("requêtes des écrans", () => {
     expect(Object.keys(book[0]).sort()).toEqual(["isMine", "limitRate", "remaining", "seq", "side"]);
   });
 
+  it("expose aux visiteurs les offres en attente, sans propriétaire", async () => {
+    await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 50_000, limitRate: 660_000 });
+    const book = await getPublicBook(sql);
+    expect(book).toEqual([expect.objectContaining({ side: "SELL_EUR", remaining: 50_000, limitRate: 660_000, isMine: false })]);
+  });
+
   it("liste les ordres de l'utilisateur avec ce qu'il a donné et reçu", async () => {
     const resting = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 492_000, limitRate: 656_000 });
     await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
@@ -580,7 +586,7 @@ describe("concurrence", () => {
     const outcomes = await Promise.allSettled(inputs.map((input) => placeOrderForUser(sql, input)));
     // Seuls des refus de limite d'activité sont admis ; tout autre échec est un bug.
     for (const o of outcomes) {
-      if (o.status === "rejected") expect(String(o.reason)).toMatch(/ordres en attente|par heure/);
+      if (o.status === "rejected") expect(String(o.reason)).toMatch(/demandes en attente|par heure/);
     }
     const accepted = outcomes.filter((o) => o.status === "fulfilled").length;
 

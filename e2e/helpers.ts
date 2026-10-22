@@ -52,8 +52,12 @@ export interface TestAccount {
   firstName: string;
 }
 
-/** Crée un compte depuis l'écran d'inscription, comme un utilisateur invité, et arrive sur l'accueil. */
-export async function signUp(page: Page, name: string, options: { phone?: string } = {}): Promise<TestAccount> {
+/**
+ * Crée un compte depuis l'écran d'inscription, comme un utilisateur invité, et arrive sur l'accueil.
+ * L'introduction du premier lancement est passée, sauf si `intro: true`.
+ */
+export async function signUp(page: Page, name: string, options: { phone?: string; intro?: boolean } = {}): Promise<TestAccount> {
+  if (!options.intro) await page.addInitScript(() => localStorage.setItem("meya:intro-done", "1"));
   const account = { email: testEmail(name), password: TEST_PASSWORD, firstName: name.charAt(0).toUpperCase() + name.slice(1) };
   await invite(account.email);
   await page.goto("/inscription");
@@ -100,16 +104,20 @@ export async function fillPaymentDetails(
   }
 }
 
-/** Passe un ordre depuis l'écran Échanger et renvoie l'URL de son détail. */
+/**
+ * Passe un échange avec le convertisseur, au taux indiqué (options avancées), et renvoie l'URL
+ * de son détail. « XOF → EUR » : j'envoie des francs CFA ; « EUR → XOF » : j'envoie des euros.
+ */
 export async function placeOrder(
   page: Page,
   order: { direction: "XOF → EUR" | "EUR → XOF"; amount: string; rate: string },
 ): Promise<string> {
   await page.goto("/app/echanger");
-  await page.getByRole("button", { name: new RegExp(order.direction) }).click();
-  await page.getByLabel("Montant à échanger").fill(order.amount);
-  await page.getByLabel(/Taux (maximum|minimum) que j'accepte/).fill(order.rate);
-  await page.getByRole("button", { name: "Confirmer l'ordre" }).click();
+  await page.getByRole("button", { name: order.direction === "XOF → EUR" ? "J'envoie des francs CFA" : "J'envoie des euros" }).click();
+  await page.getByLabel("Montant envoyé").fill(order.amount);
+  await page.locator("details.advanced summary").click();
+  await page.getByLabel("Mon taux").fill(order.rate);
+  await page.getByRole("button", { name: /Publier ma demande|Échanger maintenant/ }).click();
   await expect(page).toHaveURL(/\/app\/ordres\/[0-9a-f-]{36}\?nouveau=1$/);
   return page.url().replace(/\?nouveau=1$/, "");
 }

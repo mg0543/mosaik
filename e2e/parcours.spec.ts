@@ -15,8 +15,12 @@ import {
 test.describe("visiteur", () => {
   test("voit l'accueil et est redirigé vers la connexion hors de son espace", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Échangez vos euros");
-    await expect(page.getByRole("heading", { name: "Le marché en ce moment" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Changez vos euros");
+    // Convertisseur public : estimation immédiate, puis invitation à créer un compte.
+    await expect(page.getByLabel("Montant reçu")).toHaveText(/\d/);
+    await page.getByLabel("Montant envoyé").fill("100");
+    await expect(page.getByLabel("Montant reçu")).toHaveText("65 595");
+    await expect(page.getByRole("link", { name: "Créer un compte pour échanger" })).toBeVisible();
 
     await page.goto("/app/ordres");
     await expect(page).toHaveURL(/\/connexion$/);
@@ -60,7 +64,7 @@ test.describe("visiteur", () => {
 test.describe("compte", () => {
   test("s'inscrit, se déconnecte puis se reconnecte avec son mot de passe", async ({ page }) => {
     const account = await signUp(page, "awa", { phone: "+221 77 123 45 67" });
-    await expect(page.getByRole("heading", { name: "Bonjour Awa" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bonjour Awa/ })).toBeVisible();
     await page.goto("/app/compte");
     await expect(page.getByText("Awa Test")).toBeVisible();
     await expect(page.getByText("+221771234567")).toBeVisible();
@@ -154,29 +158,29 @@ test("deux participants s'échangent des devises et règlent l'échange de bout 
   await signUp(pageA, "alice");
   await fillPaymentDetails(pageA, { iban: EXAMPLE_IBAN, ibanHolder: "Alice Test" });
   const orderA = await placeOrder(pageA, { direction: "XOF → EUR", amount: "492 000", rate: "656" });
-  await expect(pageA.getByText("Il attend dans le carnet")).toBeVisible();
+  await expect(pageA.getByText("Votre demande est publiée")).toBeVisible();
 
   // Bob s'inscrit, renseigne son Wave et vend 500 € : il croise Alice à 656.
   await signUp(pageB, "bob");
   await fillPaymentDetails(pageB, { phone: "+221 77 000 00 02", phoneHolder: "Bob Test" });
   const orderB = await placeOrder(pageB, { direction: "EUR → XOF", amount: "500", rate: "650" });
-  await expect(pageB.getByText("Servi tout de suite par 1 contrepartie.")).toBeVisible();
+  await expect(pageB.getByText("1 partenaire a été trouvé tout de suite.")).toBeVisible();
   await expect(pageB.getByText(/Vous recevez : 328\s000 XOF/)).toBeVisible();
 
   // 1. Bob, arrivé en dernier, paie en premier : il voit l'IBAN d'Alice.
-  await expect(pageB.getByText("Action requise")).toBeVisible();
+  await expect(pageB.getByText("À vous de jouer")).toBeVisible();
   await expect(pageB.getByText(/envoyez exactement\s+500,00\s€/)).toBeVisible();
   await expect(pageB.getByText(EXAMPLE_IBAN)).toBeVisible();
   await expect(pageB.getByText("Alice Test", { exact: true })).toBeVisible();
   await expect(pageB.getByRole("button", { name: "J'ai envoyé l'argent" })).toBeDisabled();
   await confirmStep(pageB, /J'ai envoyé 500,00\s€ à Alice Test/, "J'ai envoyé l'argent");
-  await expect(pageB.getByText("La contrepartie doit confirmer qu'elle a bien reçu votre paiement.", { exact: false })).toBeVisible();
+  await expect(pageB.getByText("Votre partenaire doit confirmer qu'il a bien reçu votre paiement.", { exact: false })).toBeVisible();
 
   // 2. Alice voit la tâche sur son accueil, confirme la réception, puis 3. envoie sa part au Wave de Bob.
   await pageA.goto("/app");
   await expect(pageA.getByRole("heading", { name: "À faire (1)" })).toBeVisible();
   await pageA.getByRole("link", { name: /Confirmer une réception/ }).click();
-  await expect(pageA).toHaveURL(orderA);
+  await expect(pageA).toHaveURL(new RegExp(`^${orderA}`));
   await confirmStep(pageA, /J'ai reçu 500,00\s€ sur mon compte/, "J'ai bien reçu l'argent");
   await expect(pageA.getByText(/envoyez exactement\s+328\s000 XOF/)).toBeVisible();
   await expect(pageA.getByText("+221 77 000 00 02")).toBeVisible();
@@ -189,7 +193,7 @@ test("deux participants s'échangent des devises et règlent l'échange de bout 
   await expect(pageB.getByText("Échange réglé : les deux paiements sont confirmés.")).toBeVisible();
   await pageA.goto(orderA);
   await expect(pageA.getByText("Réglé", { exact: true })).toBeVisible();
-  await expect(pageA.getByText("Partiellement servi")).toBeVisible();
+  await expect(pageA.getByText("Servi en partie")).toBeVisible();
 
   // Bob ne peut pas ouvrir l'ordre d'Alice, même avec son adresse exacte.
   const forbidden = await pageB.goto(orderA);
@@ -198,7 +202,7 @@ test("deux participants s'échangent des devises et règlent l'échange de bout 
 
   // Alice annule le reste de son ordre (164 000 XOF).
   await pageA.goto(orderA);
-  await pageA.getByRole("button", { name: "Annuler l'ordre" }).click();
+  await pageA.getByRole("button", { name: "Annuler la partie en attente" }).click();
   await pageA.getByRole("button", { name: "Oui, annuler" }).click();
   await expect(pageA.getByText("Annulé, servi en partie")).toBeVisible();
 
@@ -227,23 +231,41 @@ test("un litige gèle le règlement", async ({ browser }) => {
   await expect(taker.getByText("Litige signalé", { exact: true })).toBeVisible();
 });
 
-test("l'écran Échanger bloque un taux aberrant et exige les coordonnées de réception", async ({ page }) => {
-  await signUp(page, "garde-fous");
+test("le convertisseur bloque un taux aberrant et exige les coordonnées de réception", async ({ page }) => {
+  await signUp(page, "gardefous");
   await page.goto("/app/echanger");
-  await page.getByLabel("Montant à échanger").fill("100 000");
-  await page.getByLabel("Taux maximum que j'accepte").fill("6559");
+  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await page.getByLabel("Montant envoyé").fill("100 000");
+  await page.locator("details.advanced summary").click();
+  await page.getByLabel("Mon taux").fill("6559");
   await expect(page.getByText(/Taux hors limites/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirmer l'ordre" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Publier ma demande|Échanger maintenant/ })).toBeDisabled();
 
-  await page.getByLabel("Taux maximum que j'accepte").fill("660");
-  await expect(page.getByText(/renseignez d'abord\s+votre IBAN/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirmer l'ordre" })).toBeDisabled();
+  await page.getByLabel("Mon taux").fill("660");
+  await expect(page.getByText(/indiquez d'abord\s+votre IBAN/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Publier ma demande" })).toBeDisabled();
 
   await fillPaymentDetails(page, { iban: EXAMPLE_IBAN });
   await page.goto("/app/echanger");
-  await page.getByLabel("Montant à échanger").fill("100 000");
-  await page.getByLabel("Taux maximum que j'accepte").fill("660");
-  await expect(page.getByRole("button", { name: "Confirmer l'ordre" })).toBeEnabled();
+  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await page.getByLabel("Montant envoyé").fill("100 000");
+  await expect(page.getByRole("button", { name: "Publier ma demande" })).toBeEnabled();
+  // Sans offre, MEYA propose le taux officiel.
+  await expect(page.getByText(/publiée au taux de 655,957/)).toBeVisible();
+});
+
+test("l'introduction s'affiche au premier lancement, puis plus jamais", async ({ page }) => {
+  await signUp(page, "intro", { intro: true });
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Bienvenue sur MEYA" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Suivant" }).click();
+  await dialog.getByRole("button", { name: "Suivant" }).click();
+  await expect(dialog.getByRole("heading", { name: "Vous vous payez, MEYA vous guide" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Commencer" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /Bonjour/ })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("refuse un IBAN dont la clé de contrôle est fausse", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkActivityPolicy, checkOrderPolicy, MAX_OPEN_ORDERS, MAX_ORDER_XOF, MAX_ORDERS_PER_HOUR } from "./policy";
+import { checkActivityPolicy, checkOrderPolicy, rateBand, MAX_OPEN_ORDERS, MAX_ORDER_XOF, MAX_ORDERS_PER_HOUR } from "./policy";
 
 describe("checkActivityPolicy", () => {
   it("laisse passer une activité normale", () => {
@@ -8,8 +8,14 @@ describe("checkActivityPolicy", () => {
   });
 
   it("bloque au-delà des ordres ouverts ou du rythme horaire", () => {
-    expect(checkActivityPolicy(MAX_OPEN_ORDERS, 0)).toMatch(/ordres en attente/);
+    expect(checkActivityPolicy(MAX_OPEN_ORDERS, 0)).toMatch(/demandes en attente/);
     expect(checkActivityPolicy(0, MAX_ORDERS_PER_HOUR)).toMatch(/par heure/);
+  });
+});
+
+describe("rateBand", () => {
+  it("donne les bornes à ±15 % autour de 655,957", () => {
+    expect(rateBand()).toEqual({ low: 557_564, high: 754_350 });
   });
 });
 

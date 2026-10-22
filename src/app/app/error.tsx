@@ -13,7 +13,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     <div className="app-page status-block">
       <h1 className="app-title">Un problème est survenu</h1>
       <p className="muted">
-        La page n&apos;a pas pu être chargée. Vos ordres ne sont pas affectés : rien n&apos;est enregistré
+        La page n&apos;a pas pu être chargée. Vos échanges ne sont pas affectés : rien n&apos;est enregistré
         sans confirmation.
       </p>
       {error.digest && <p className="field-hint">Référence : {error.digest}</p>}

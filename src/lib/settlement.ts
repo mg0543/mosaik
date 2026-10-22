@@ -66,7 +66,7 @@ export function settlementStatus(
   const step = nextStep(state);
   if (!step) return { label: "Réglé", tone: "done" };
   if (now > state.dueAt) return { label: "En retard", tone: "late" };
-  return STEP_ACTOR[step] === role ? { label: "À vous d'agir", tone: "todo" } : { label: "En attente de la contrepartie", tone: "wait" };
+  return STEP_ACTOR[step] === role ? { label: "À vous d'agir", tone: "todo" } : { label: "En attente de votre partenaire", tone: "wait" };
 }
 
 /** Libellé d'une étape, du point de vue de celui qui regarde. */
@@ -75,10 +75,10 @@ export function stepLabel(step: SettlementStep, role: SettlementRole): string {
   switch (step) {
     case "taker_sent":
     case "maker_sent":
-      return mine ? "Vous envoyez votre part" : "La contrepartie envoie sa part";
+      return mine ? "Vous envoyez votre part" : "Votre partenaire envoie sa part";
     case "maker_received":
     case "taker_received":
-      return mine ? "Vous confirmez la réception" : "La contrepartie confirme la réception";
+      return mine ? "Vous confirmez la réception" : "Votre partenaire confirme la réception";
   }
 }
 

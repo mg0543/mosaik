@@ -7,5 +7,5 @@ export function orderStatus(order: {
 }): { label: string; tone: StatusTone } {
   if (order.status === "filled") return { label: "Servi", tone: "done" };
   if (order.status === "cancelled") return { label: order.given > 0 ? "Annulé, servi en partie" : "Annulé", tone: "off" };
-  return order.given > 0 ? { label: "Partiellement servi", tone: "partial" } : { label: "En attente", tone: "open" };
+  return order.given > 0 ? { label: "Servi en partie", tone: "partial" } : { label: "En attente d'un partenaire", tone: "open" };
 }

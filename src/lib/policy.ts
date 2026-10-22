@@ -23,24 +23,31 @@ export const MAX_ORDERS_PER_HOUR = 30;
  */
 export function checkActivityPolicy(openOrders: number, ordersLastHour: number): string | null {
   if (openOrders >= MAX_OPEN_ORDERS) {
-    return `Vous avez déjà ${MAX_OPEN_ORDERS} ordres en attente : annulez-en un avant d'en passer un nouveau.`;
+    return `Vous avez déjà ${MAX_OPEN_ORDERS} demandes en attente : annulez-en une avant d'en créer une nouvelle.`;
   }
   if (ordersLastHour >= MAX_ORDERS_PER_HOUR) {
-    return `Limite de ${MAX_ORDERS_PER_HOUR} ordres par heure atteinte. Réessayez un peu plus tard.`;
+    return `Limite de ${MAX_ORDERS_PER_HOUR} échanges par heure atteinte. Réessayez un peu plus tard.`;
   }
   return null;
 }
 
 /** Renvoie la raison du refus, ou null si l'ordre respecte les garde-fous. */
+/** Bornes du taux limite autorisé, en millièmes : ±RATE_BAND_PCT autour de la référence. */
+export function rateBand(): { low: RateMilli; high: RateMilli } {
+  return {
+    low: Math.ceil((REFERENCE_RATE * (100 - RATE_BAND_PCT)) / 100),
+    high: Math.floor((REFERENCE_RATE * (100 + RATE_BAND_PCT)) / 100),
+  };
+}
+
 export function checkOrderPolicy(side: Side, amount: number, limitRate: RateMilli): string | null {
-  const low = Math.ceil((REFERENCE_RATE * (100 - RATE_BAND_PCT)) / 100);
-  const high = Math.floor((REFERENCE_RATE * (100 + RATE_BAND_PCT)) / 100);
+  const { low, high } = rateBand();
   if (limitRate < low || limitRate > high) {
     return `Taux hors limites : il doit rester à ±${RATE_BAND_PCT} % du taux de référence.`;
   }
   const xofEquivalent = side === "SELL_XOF" ? amount : xofForEurCents(amount, REFERENCE_RATE);
   if (xofEquivalent > MAX_ORDER_XOF) {
-    return `Montant trop élevé pour le pilote : ${MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF au plus par ordre (ou l'équivalent en euros).`;
+    return `Montant trop élevé pour le pilote : ${MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF au plus par échange (ou l'équivalent en euros).`;
   }
   return null;
 }

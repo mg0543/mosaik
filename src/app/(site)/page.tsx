@@ -1,114 +1,116 @@
 import Link from "next/link";
-import { fmtEur, fmtRate, fmtXof, rateGap } from "@/lib/format";
+import { Converter } from "@/components/converter";
+import { ExchangeIllustration, StepIcon } from "@/components/illustrations";
+import type { PublicBookEntry } from "@/lib/preview";
 import { isBackendConfigured } from "@/server/config";
 import { getSql } from "@/server/db";
-import { getMarketSnapshot, type MarketSnapshot } from "@/server/queries";
+import { getPublicBook } from "@/server/queries";
 
-// Le marché change à chaque ordre : la page est rendue à chaque visite.
+// Les offres changent à chaque échange : la page est rendue à chaque visite.
 export const dynamic = "force-dynamic";
 
-async function loadMarket(): Promise<MarketSnapshot | null> {
-  if (!isBackendConfigured()) return null;
+async function loadBook(): Promise<PublicBookEntry[]> {
+  if (!isBackendConfigured()) return [];
   try {
-    return await getMarketSnapshot(getSql());
+    return await getPublicBook(getSql());
   } catch (error) {
-    console.error("Lecture du marché impossible", error);
-    return null;
+    console.error("Lecture des offres impossible", error);
+    return [];
   }
 }
 
 export default async function HomePage() {
-  const market = await loadMarket();
+  const book = await loadBook();
 
   return (
     <>
-      <section className="hero-block">
-        <h1>Échangez vos euros et vos francs CFA entre particuliers.</h1>
-        <p className="lead">
-          Vous fixez votre taux. MEYA trouve une ou plusieurs personnes qui font l&apos;échange
-          inverse, et vous n&apos;obtenez jamais moins bien que le taux que vous avez choisi.
-        </p>
-        <div className="cta-row">
-          <Link href="/inscription" className="btn btn-primary btn-lg">Créer un compte</Link>
-          <Link href="/simulateur" className="btn btn-secondary btn-lg">Essayer le simulateur</Link>
+      <section className="landing-hero">
+        <div className="hero-copy">
+          <span className="hero-kicker">Euro ⇄ Franc CFA, entre particuliers</span>
+          <h1>Changez vos euros et vos francs CFA, simplement.</h1>
+          <p className="hero-lead">
+            Indiquez combien vous envoyez : MEYA vous montre tout de suite combien vous recevez, au meilleur
+            taux proposé par d&apos;autres particuliers. Sans frais pendant le pilote.
+          </p>
+          <ul className="hero-points">
+            <li><StepIcon name="rate" /> Le meilleur taux disponible, affiché avant de vous engager</li>
+            <li><StepIcon name="shield" /> Chaque étape du paiement confirmée des deux côtés</li>
+            <li><StepIcon name="free" /> 0 frais MEYA pendant le pilote</li>
+          </ul>
+          <div className="hero-art"><ExchangeIllustration size={190} /></div>
+        </div>
+        <div className="hero-card">
+          <Converter book={book} mode="public" />
         </div>
       </section>
 
-      <section className="market" aria-labelledby="market-title">
-        <h2 id="market-title" className="section-title">Le marché en ce moment</h2>
-        {market ? (
-          <div className="market-grid">
-            <MarketCard
-              title="Pour obtenir des euros"
-              rate={market.bestEurOffer}
-              hint="meilleur taux proposé par les vendeurs d'euros"
-              volume={market.eurAvailableCents > 0 ? `${fmtEur(market.eurAvailableCents)} disponibles` : null}
-            />
-            <MarketCard
-              title="Pour obtenir des XOF"
-              rate={market.bestXofOffer}
-              hint="meilleur taux proposé par les vendeurs de XOF"
-              volume={market.xofAvailable > 0 ? `${fmtXof(market.xofAvailable)} disponibles` : null}
-            />
-          </div>
-        ) : (
-          <div className="notice info" style={{ marginTop: 0 }}>
-            Le pilote ouvre bientôt. En attendant, le simulateur montre comment un échange est réparti
-            entre plusieurs personnes.
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="how-title">
-        <h2 id="how-title" className="section-title">Comment ça marche</h2>
-        <ol className="steps">
-          <li>
-            <strong>Vous passez un ordre.</strong> Le montant que vous voulez échanger et votre taux
-            limite : le minimum que vous acceptez, ou le maximum que vous êtes prêt à donner.
+      <section className="how" aria-labelledby="how-title">
+        <h2 id="how-title" className="big-title">Comment ça marche</h2>
+        <ol className="how-steps">
+          <li className="how-step">
+            <StepIcon name="amount" />
+            <span className="how-num">1</span>
+            <h3>Vous indiquez un montant</h3>
+            <p>Par exemple 500 €. MEYA calcule ce que vous recevez en francs CFA avec les meilleures offres du moment.</p>
           </li>
-          <li>
-            <strong>MEYA l&apos;apparie.</strong> Votre ordre est servi par une ou plusieurs
-            personnes, les meilleurs taux d&apos;abord. Ce qui n&apos;est pas servi attend dans le
-            carnet à votre taux.
+          <li className="how-step">
+            <StepIcon name="match" />
+            <span className="how-num">2</span>
+            <h3>MEYA trouve vos partenaires</h3>
+            <p>
+              Une ou plusieurs personnes font l&apos;échange inverse. S&apos;il n&apos;y en a pas encore, votre demande est
+              publiée et servie dès que quelqu&apos;un correspond.
+            </p>
           </li>
-          <li>
-            <strong>Vous réglez directement.</strong> Pour chaque échange, MEYA vous indique combien
-            envoyer et à qui. Celui dont l&apos;ordre est arrivé en dernier paie en premier ; chacun
-            confirme l&apos;envoi puis la réception, dans les 24 heures.
+          <li className="how-step">
+            <StepIcon name="settle" />
+            <span className="how-num">3</span>
+            <h3>Vous vous payez, pas à pas</h3>
+            <p>
+              MEYA vous dit exactement combien envoyer et à qui (virement ou mobile money), puis chacun confirme
+              l&apos;envoi et la réception. Comptez 24 heures au plus.
+            </p>
           </li>
         </ol>
       </section>
 
-      <section aria-labelledby="trust-title">
-        <h2 id="trust-title" className="section-title">Nos engagements</h2>
-        <ul className="pledges">
-          <li><strong>Jamais au-delà de votre taux.</strong> Chaque échange se fait au taux affiché ou mieux pour vous.</li>
-          <li><strong>Calcul exact.</strong> Montants en centimes et en XOF entiers ; l&apos;écart d&apos;arrondi reste inférieur à 1 XOF par échange, et tout reste est affiché.</li>
-          <li><strong>Pas de fonds détenus.</strong> Pendant le pilote, MEYA ne reçoit ni ne transfère d&apos;argent.</li>
-          <li>
-            <strong>Discrétion.</strong> Votre adresse e-mail n&apos;est jamais affichée ; vos coordonnées de
-            paiement ne sont transmises qu&apos;à vos contreparties, pour l&apos;échange concerné.
-          </li>
-        </ul>
+      <section className="why" aria-labelledby="why-title">
+        <h2 id="why-title" className="big-title">Pourquoi faire confiance à MEYA</h2>
+        <div className="why-grid">
+          <div className="why-card">
+            <StepIcon name="rate" />
+            <h3>Jamais moins bien qu&apos;annoncé</h3>
+            <p>
+              Le taux affiché avant de confirmer est un plancher : vous n&apos;échangez jamais à un taux moins bon,
+              y compris pour la partie qui attend un partenaire.
+            </p>
+          </div>
+          <div className="why-card">
+            <StepIcon name="shield" />
+            <h3>Un parcours encadré</h3>
+            <p>
+              Ordre de paiement imposé, une seule personne exposée à la fois, coordonnées figées et signalement
+              en cas de problème.
+            </p>
+          </div>
+          <div className="why-card">
+            <StepIcon name="free" />
+            <h3>Votre argent ne passe pas par nous</h3>
+            <p>Vous payez directement votre partenaire. MEYA ne détient jamais vos fonds.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="cta-band">
+        <div>
+          <h2>Prêt à faire votre premier échange ?</h2>
+          <p>Inscription en une minute. Seuls votre nom, votre e-mail et un mot de passe sont nécessaires.</p>
+        </div>
+        <div className="cta-row">
+          <Link href="/inscription" className="btn btn-sun btn-lg">Créer un compte</Link>
+          <Link href="/connexion" className="btn btn-ghost btn-lg">J&apos;ai déjà un compte</Link>
+        </div>
       </section>
     </>
-  );
-}
-
-function MarketCard({ title, rate, hint, volume }: { title: string; rate: number | null; hint: string; volume: string | null }) {
-  return (
-    <div className="card market-card">
-      <div className="stat-label">{title}</div>
-      {rate !== null ? (
-        <>
-          <div className="market-rate num">{fmtRate(rate)} <span>XOF / €</span></div>
-          <div className="stat-sub">{hint}</div>
-          <div className="stat-sub">{rateGap(rate)}</div>
-          {volume && <div className="stat-sub num">{volume}</div>}
-        </>
-      ) : (
-        <div className="stat-sub" style={{ marginTop: 8 }}>Aucune offre pour le moment.</div>
-      )}
-    </div>
   );
 }

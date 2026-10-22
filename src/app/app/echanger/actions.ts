@@ -38,8 +38,8 @@ export async function placeOrderAction(_prev: ExchangeState, formData: FormData)
     ({ orderId } = await placeOrderForUser(getSql(), { userId: user.id, side, amount, limitRate }));
   } catch (error) {
     if (error instanceof RangeError) return { error: error.message };
-    console.error("Enregistrement de l'ordre impossible", error);
-    return { error: "L'ordre n'a pas pu être enregistré. Réessayez dans un instant." };
+    console.error("Enregistrement de l'échange impossible", error);
+    return { error: "L'échange n'a pas pu être enregistré. Réessayez dans un instant." };
   }
 
   redirect(`/app/ordres/${orderId}?nouveau=1`);
