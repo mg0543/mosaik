@@ -106,8 +106,9 @@ Pour ouvrir le pilote :
 
 ## Inviter un participant au pilote
 
-Le pilote est sur invitation : seules les adresses invitées peuvent créer un compte
-(`MOSAIK_INVITE_ONLY=false` ouvre l'inscription à tous).
+Par défaut, seules les adresses invitées peuvent créer un compte. `MOSAIK_INVITE_ONLY=false`
+ouvre l'inscription à tous : **c'est le réglage actuel de la production** (variable Vercel).
+Pour revenir à l'invitation, supprimer cette variable dans Vercel puis redéployer.
 Dans Supabase > SQL Editor :
 
 ```sql
