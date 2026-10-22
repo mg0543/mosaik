@@ -113,3 +113,14 @@ export function describePayTo(payTo: PayTo): { method: string; account: string; 
     ? { method: "Virement bancaire (IBAN)", account: fmtIban(payTo.account), holder: payTo.holder }
     : { method: XOF_OPERATORS[payTo.method], account: fmtPhone(payTo.account), holder: payTo.holder };
 }
+
+/** IBAN masqué pour un affichage discret : FR76 •••• 0189. */
+export function maskIban(iban: string): string {
+  return `${iban.slice(0, 4)} •••• ${iban.slice(-4)}`;
+}
+
+/** Numéro masqué : +221 •• •• 45 67. */
+export function maskPhone(phone: string): string {
+  const match = /^\+(\d{3})\d*(\d{2})(\d{2})$/.exec(phone);
+  return match ? `+${match[1]} •• •• ${match[2]} ${match[3]}` : phone;
+}

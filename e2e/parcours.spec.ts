@@ -8,6 +8,7 @@ import {
   invite,
   logIn,
   placeOrder,
+  sendCurrency,
   signUp,
   TEST_PASSWORD,
   testEmail,
@@ -239,7 +240,7 @@ test("un litige gèle le règlement", async ({ browser }) => {
 test("le convertisseur bloque un taux aberrant et exige les coordonnées de réception", async ({ page }) => {
   await signUp(page, "gardefous");
   await page.goto("/app/echanger");
-  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await sendCurrency(page, "XOF");
   await page.getByLabel("Montant envoyé").fill("100 000");
   await page.locator("details.advanced summary").click();
   await page.getByLabel("Mon taux").fill("6559");
@@ -252,7 +253,7 @@ test("le convertisseur bloque un taux aberrant et exige les coordonnées de réc
 
   await fillPaymentDetails(page, { iban: EXAMPLE_IBAN });
   await page.goto("/app/echanger");
-  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await sendCurrency(page, "XOF");
   await page.getByLabel("Montant envoyé").fill("100 000");
   await expect(page.getByRole("button", { name: "Publier ma demande" })).toBeEnabled();
   // Sans offre, MEYA propose le taux officiel.
@@ -332,7 +333,7 @@ test("propose de n'échanger que la partie disponible", async ({ browser }) => {
   await signUp(taker, "partiel-b");
   await fillPaymentDetails(taker, { iban: EXAMPLE_IBAN, ibanHolder: "Jean Test" });
   await taker.goto("/app");
-  await taker.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await sendCurrency(taker, "XOF");
   await taker.getByLabel("Montant envoyé").fill("100 000");
   await expect(taker.getByText("Il n'y a pas de partenaire pour tout le montant.")).toBeVisible();
   await taker.getByRole("radio", { name: /Seulement la partie disponible/ }).check();
@@ -380,10 +381,10 @@ test("le convertisseur affiche et applique les plafonds", async ({ page }) => {
   await signUp(page, "plafonds");
   await page.goto("/app/echanger");
   await expect(page.getByText(/Vous pouvez encore échanger 2\s000\s000 XOF aujourd'hui/)).toBeVisible();
-  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await sendCurrency(page, "XOF");
   await page.getByLabel("Montant envoyé").fill("2 000 001");
   await expect(page.getByText(/Montant trop élevé : 2\s000\s000 XOF au plus par échange/)).toBeVisible();
-  await page.getByRole("button", { name: "J'envoie des euros" }).click();
+  await sendCurrency(page, "EUR");
   await page.getByLabel("Montant envoyé").fill("3 100");
   await expect(page.getByText(/Montant trop élevé/)).toBeVisible();
 });

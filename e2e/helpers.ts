@@ -122,14 +122,26 @@ export async function placeOrder(
   page: Page,
   order: { direction: "XOF → EUR" | "EUR → XOF"; amount: string; rate: string },
 ): Promise<string> {
-  await page.goto("/app/echanger");
-  await page.getByRole("button", { name: order.direction === "XOF → EUR" ? "J'envoie des francs CFA" : "J'envoie des euros" }).click();
+  await page.goto("/app");
+  await sendCurrency(page, order.direction === "XOF → EUR" ? "XOF" : "EUR");
   await page.getByLabel("Montant envoyé").fill(order.amount);
   await page.locator("details.advanced summary").click();
   await page.getByLabel("Mon taux").fill(order.rate);
   await page.getByRole("button", { name: /Publier ma demande|Échanger maintenant/ }).click();
   await expect(page).toHaveURL(/\/app\/ordres\/[0-9a-f-]{36}\?nouveau=1$/);
   return page.url().replace(/\?nouveau=1$/, "");
+}
+
+/**
+ * Choisit la devise envoyée dans le convertisseur de l'Accueil : la devise de gauche est lue,
+ * puis le bouton ⇄ est utilisé si besoin.
+ */
+export async function sendCurrency(page: Page, currency: "EUR" | "XOF"): Promise<void> {
+  const row = page.locator("[data-send-currency]");
+  if ((await row.getAttribute("data-send-currency")) !== currency) {
+    await page.getByRole("button", { name: "Inverser le sens de l'échange" }).click();
+  }
+  await expect(row).toHaveAttribute("data-send-currency", currency);
 }
 
 /** Coche la case de confirmation d'une étape du règlement puis valide. */

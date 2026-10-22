@@ -6,6 +6,7 @@ import {
   fmtEurNumber,
   fmtGiven,
   fmtPct,
+  fmtRelative,
   fmtRate,
   fmtReceived,
   fmtXof,
@@ -65,5 +66,18 @@ describe("mise en forme", () => {
     expect(sideLabel("SELL_EUR")).toBe("Euros → Francs CFA");
     expect(plain(fmtDate(new Date("2026-10-20T14:05:00Z")))).toBe("20 oct. 2026, 14:05");
     expect(plain(fmtDate(new Date("2026-10-20T14:05:00Z"), "Europe/Paris"))).toBe("20 oct. 2026, 16:05");
+  });
+});
+
+describe("dates relatives", () => {
+  const now = new Date("2026-10-22T12:00:00Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+  it("dit à l'instant, en minutes, en heures, hier, puis en jours", () => {
+    expect(fmtRelative(ago(20_000), now)).toBe("à l'instant");
+    expect(fmtRelative(ago(5 * 60_000), now)).toBe("il y a 5 min");
+    expect(fmtRelative(ago(3 * 3_600_000), now)).toBe("il y a 3 h");
+    expect(fmtRelative(ago(30 * 3_600_000), now)).toBe("hier");
+    expect(fmtRelative(ago(2 * 86_400_000), now)).toBe("il y a 2 jours");
+    expect(fmtRelative(new Date("2026-08-01T10:00:00Z"), now).replace(/[  ]/g, " ")).toBe("1 août 2026");
   });
 });

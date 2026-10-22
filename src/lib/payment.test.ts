@@ -5,6 +5,8 @@ import {
   fmtPhone,
   isValidIban,
   isXofOperator,
+  maskIban,
+  maskPhone,
   parseHolder,
   parseIban,
   parseXofPhone,
@@ -97,5 +99,12 @@ describe("titulaire et opérateur", () => {
     expect(describePayTo({ method: "iban", account: FR_EXAMPLE, holder: "Jean Martin" }).account).toBe(
       "FR76 3000 6000 0112 3456 7890 189",
     );
+  });
+});
+
+describe("masquage pour l'affichage", () => {
+  it("ne montre que le début et la fin de l'IBAN, et la fin du numéro", () => {
+    expect(maskIban(FR_EXAMPLE)).toBe("FR76 •••• 0189");
+    expect(maskPhone("+221771234567")).toBe("+221 •• •• 45 67");
   });
 });

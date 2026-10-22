@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { placeOrderAction, type ExchangeState } from "@/app/app/echanger/actions";
+import { Flag } from "@/components/flags";
+import { isXofCountry, XOF_COUNTRIES, type XofCountry } from "@/lib/countries";
 import { averageRate, fmtEur, fmtEurNumber, fmtRate, fmtXof, fmtXofNumber } from "@/lib/format";
 import { eurCentsForXof, parseEurCents, parseRate, parseXof, REFERENCE_RATE, xofForEurCents, type Side } from "@/lib/matching";
 import { checkOrderPolicy, checkVolumePolicy, MAX_MONTHLY_XOF, MAX_ORDER_XOF, remainingAllowance, type VolumeUsage } from "@/lib/policy";
@@ -25,6 +27,10 @@ interface Props {
   usage?: VolumeUsage;
   /** Ouverture préremplie, par exemple depuis une offre choisie dans Activité. */
   initial?: { side: Side; amount: string; rate?: string };
+  /** « hero » : présentation d'accueil (devises avec drapeaux, montants côte à côte). */
+  variant?: "card" | "hero";
+  /** Pays affiché côté XOF (déduit du numéro de l'utilisateur), modifiable. */
+  country?: XofCountry | null;
 }
 
 type Estimate =
@@ -85,7 +91,7 @@ function estimate(book: PublicBookEntry[], side: Side, amountInput: string, cust
   }
 }
 
-export function Converter({ book, mode, canReceive, usage, initial }: Props) {
+export function Converter({ book, mode, canReceive, usage, initial, variant = "card", country = null }: Props) {
   const [state, action, pending] = useActionState<ExchangeState, FormData>(placeOrderAction, {});
   const [side, setSide] = useState<Side>(initial?.side ?? "SELL_EUR");
   const [amounts, setAmounts] = useState<Record<Side, string>>(() => {
@@ -95,6 +101,8 @@ export function Converter({ book, mode, canReceive, usage, initial }: Props) {
   const [customRate, setCustomRate] = useState(initial?.rate ?? "");
   // Matching partiel : ne prendre que ce qui est disponible tout de suite, sans rien laisser en attente.
   const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [xofCountry, setXofCountry] = useState<XofCountry | null>(country);
+  const hero = variant === "hero";
   const sendEur = side === "SELL_EUR";
   const amountInput = amounts[side];
   const est = estimate(book, side, amountInput, customRate, usage);
@@ -112,46 +120,83 @@ export function Converter({ book, mode, canReceive, usage, initial }: Props) {
   }
 
   return (
-    <form action={action} className="converter" aria-label="Convertisseur">
+    <form action={action} className={hero ? "converter hero" : "converter"} aria-label="Convertisseur">
       <input type="hidden" name="side" value={side} />
       <input type="hidden" name="amount" value={submittedAmount} />
       <input type="hidden" name="rate" value={est.kind === "ok" ? fmtRate(est.limitRate) : ""} />
 
-      <div className="direction" role="group" aria-label="Ce que vous envoyez">
-        <button type="button" aria-pressed={sendEur} onClick={() => switchSide("SELL_EUR")}>J&apos;envoie des euros</button>
-        <button type="button" aria-pressed={!sendEur} onClick={() => switchSide("SELL_XOF")}>J&apos;envoie des francs CFA</button>
-      </div>
+      {hero ? (
+        <>
+          <div className="hero-currencies" data-send-currency={sendEur ? "EUR" : "XOF"}>
+            <CurrencyBadge currency={sendEur ? "EUR" : "XOF"} country={xofCountry} onCountry={setXofCountry} />
+            <CurrencyBadge currency={sendEur ? "XOF" : "EUR"} country={xofCountry} onCountry={setXofCountry} pill />
+          </div>
+          <div className="hero-amounts">
+            <input className="hero-amount num" inputMode={sendEur ? "decimal" : "numeric"} autoComplete="off" aria-label="Montant envoyé"
+              value={amountInput} placeholder="0" onChange={(e) => setAmounts((p) => ({ ...p, [side]: e.target.value }))} />
+            <button type="button" className="hero-swap" onClick={() => switchSide(sendEur ? "SELL_XOF" : "SELL_EUR")}
+              aria-label="Inverser le sens de l'échange">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9h15l-4-4M20 15H5l4 4" /></svg>
+            </button>
+            <output className="hero-amount received num" aria-label="Montant reçu" aria-live="polite">
+              {est.kind !== "ok" ? "0" : sendEur ? fmtXofNumber(est.total) : fmtEurNumber(est.total)}
+            </output>
+          </div>
+          {est.kind === "ok" && (
+            <p className="hero-rate num">
+              1,00 € = {fmtRate(est.displayRate)} FCFA <span aria-hidden="true">•</span> Sans frais MEYA
+            </p>
+          )}
+          {est.kind === "ok" && !(mode === "app" && partial) && (
+            <p className={est.waiting === 0 ? "hero-status ok" : "hero-status pending"}>
+              {est.waiting === 0
+                ? `${est.partners} partenaire${est.partners > 1 ? "s" : ""} disponible${est.partners > 1 ? "s" : ""} maintenant`
+                : est.partners > 0
+                  ? `${money(true, est.receivedNow)} tout de suite, le reste dès qu'un partenaire accepte ${fmtRate(est.limitRate)}`
+                  : `Pas de partenaire à l'instant : votre demande sera publiée au taux de ${fmtRate(est.limitRate)}`}
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+        <div className="direction" role="group" aria-label="Ce que vous envoyez">
+          <button type="button" aria-pressed={sendEur} onClick={() => switchSide("SELL_EUR")}>J&apos;envoie des euros</button>
+          <button type="button" aria-pressed={!sendEur} onClick={() => switchSide("SELL_XOF")}>J&apos;envoie des francs CFA</button>
+        </div>
 
-      <label className="money-field">
-        <span className="money-label">Vous envoyez</span>
-        <span className="money-row">
-          <input inputMode={sendEur ? "decimal" : "numeric"} autoComplete="off" aria-label="Montant envoyé"
-            value={amountInput} onChange={(e) => setAmounts((p) => ({ ...p, [side]: e.target.value }))} />
-          <span className={`currency ${sendEur ? "eur" : "xof"}`}>{sendEur ? "EUR" : "XOF"}</span>
-        </span>
-      </label>
+        <label className="money-field">
+          <span className="money-label">Vous envoyez</span>
+          <span className="money-row">
+            <input inputMode={sendEur ? "decimal" : "numeric"} autoComplete="off" aria-label="Montant envoyé"
+              value={amountInput} onChange={(e) => setAmounts((p) => ({ ...p, [side]: e.target.value }))} />
+            <span className={`currency ${sendEur ? "eur" : "xof"}`}>{sendEur ? "EUR" : "XOF"}</span>
+          </span>
+        </label>
 
-      <div className="swap-row">
-        <button type="button" className="swap" onClick={() => switchSide(sendEur ? "SELL_XOF" : "SELL_EUR")}
-          aria-label="Inverser le sens de l'échange">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" /></svg>
-        </button>
-      </div>
+        <div className="swap-row">
+          <button type="button" className="swap" onClick={() => switchSide(sendEur ? "SELL_XOF" : "SELL_EUR")}
+            aria-label="Inverser le sens de l'échange">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4" /></svg>
+          </button>
+        </div>
 
-      <div className="money-field received" aria-live="polite">
-        <span className="money-label">{est.kind === "ok" && est.waiting > 0 ? "Vous recevrez environ" : "Vous recevez"}</span>
-        <span className="money-row">
-          <output className="money-out num" aria-label="Montant reçu">
-            {est.kind !== "ok" ? "—" : sendEur ? fmtXofNumber(est.total) : fmtEurNumber(est.total)}
-          </output>
-          <span className={`currency ${sendEur ? "xof" : "eur"}`}>{sendEur ? "XOF" : "EUR"}</span>
-        </span>
-      </div>
+        <div className="money-field received" aria-live="polite">
+          <span className="money-label">{est.kind === "ok" && est.waiting > 0 ? "Vous recevrez environ" : "Vous recevez"}</span>
+          <span className="money-row">
+            <output className="money-out num" aria-label="Montant reçu">
+              {est.kind !== "ok" ? "—" : sendEur ? fmtXofNumber(est.total) : fmtEurNumber(est.total)}
+            </output>
+            <span className={`currency ${sendEur ? "xof" : "eur"}`}>{sendEur ? "XOF" : "EUR"}</span>
+          </span>
+        </div>
+        </>
+      )}
 
       {est.kind === "error" && <p className="error" role="alert" style={{ margin: 0 }}>{est.message}</p>}
 
-      {est.kind === "ok" && (
+      {!hero && est.kind === "ok" && (
         <ul className="quote-facts">
           <li><span>Taux</span><strong className="num">1 € = {fmtRate(est.displayRate)} XOF</strong></li>
           <li><span>Frais MEYA</span><strong>0 pendant le pilote</strong></li>
@@ -244,5 +289,39 @@ export function Converter({ book, mode, canReceive, usage, initial }: Props) {
         </details>
       )}
     </form>
+  );
+}
+
+/** Devise avec son drapeau ; côté XOF, un menu permet de choisir le pays. */
+function CurrencyBadge({
+  currency,
+  country,
+  onCountry,
+  pill = false,
+}: {
+  currency: "EUR" | "XOF";
+  country: XofCountry | null;
+  onCountry: (c: XofCountry) => void;
+  pill?: boolean;
+}) {
+  if (currency === "EUR") {
+    return (
+      <span className={pill ? "cur-badge pill" : "cur-badge"}>
+        <Flag code="EU" size={26} />
+        <span>EUR</span>
+      </span>
+    );
+  }
+  return (
+    <label className={pill ? "cur-badge pill select" : "cur-badge select"}>
+      {country ? <Flag code={country} size={26} /> : <span className="cfa-coin" aria-hidden="true">CFA</span>}
+      <span>XOF</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      <select aria-label="Pays du franc CFA" value={country ?? ""} onChange={(e) => isXofCountry(e.target.value) && onCountry(e.target.value)}>
+        <option value="" disabled>Choisir le pays</option>
+        {XOF_COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+      </select>
+    </label>
   );
 }
