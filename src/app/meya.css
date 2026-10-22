@@ -909,17 +909,10 @@
 /* ---------- En-tête : cloche et lien d'administration ---------- */
 
 .header-tools {
-  margin-left: 8px;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* Sur mobile, le menu du haut est masqué : les outils se calent à droite. */
-@media (max-width: 720px) {
-  .header-tools {
-    margin-left: auto;
-  }
 }
 
 .bell {
@@ -1521,4 +1514,54 @@
     animation: none;
     stroke-dashoffset: 0;
   }
+}
+
+/* ---------- Offres disponibles (Activité) ---------- */
+
+.offer-group + .offer-group {
+  margin-top: 16px;
+}
+
+.offer-group h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.offer-empty {
+  margin: 0;
+  font-size: 13px;
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.offer > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.offer .muted {
+  font-size: 12px;
+}
+
+.offer .btn {
+  flex: none;
 }

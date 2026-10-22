@@ -31,7 +31,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             MEYA
           </Link>
           <span className="tag">Pilote</span>
-          <AppNav variant="top" />
           <div className="header-tools">
             {admin && <Link href="/admin" className="admin-link">Admin</Link>}
             <Link href="/app/notifications" className="bell"
@@ -58,7 +57,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <InstallHint />
         {children}
       </main>
-      <AppNav variant="tabs" />
+      <AppNav />
     </div>
   );
 }

@@ -23,6 +23,8 @@ interface Props {
   canReceive?: Record<Side, boolean>;
   /** Mode app : volume déjà engagé aujourd'hui et ce mois-ci, pour appliquer les plafonds. */
   usage?: VolumeUsage;
+  /** Ouverture préremplie, par exemple depuis une offre choisie dans Activité. */
+  initial?: { side: Side; amount: string; rate?: string };
 }
 
 type Estimate =
@@ -83,11 +85,14 @@ function estimate(book: PublicBookEntry[], side: Side, amountInput: string, cust
   }
 }
 
-export function Converter({ book, mode, canReceive, usage }: Props) {
+export function Converter({ book, mode, canReceive, usage, initial }: Props) {
   const [state, action, pending] = useActionState<ExchangeState, FormData>(placeOrderAction, {});
-  const [side, setSide] = useState<Side>("SELL_EUR");
-  const [amounts, setAmounts] = useState<Record<Side, string>>({ SELL_EUR: "500", SELL_XOF: "300 000" });
-  const [customRate, setCustomRate] = useState("");
+  const [side, setSide] = useState<Side>(initial?.side ?? "SELL_EUR");
+  const [amounts, setAmounts] = useState<Record<Side, string>>(() => {
+    const defaults: Record<Side, string> = { SELL_EUR: "500", SELL_XOF: "300 000" };
+    return initial ? { ...defaults, [initial.side]: initial.amount } : defaults;
+  });
+  const [customRate, setCustomRate] = useState(initial?.rate ?? "");
   // Matching partiel : ne prendre que ce qui est disponible tout de suite, sans rien laisser en attente.
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const sendEur = side === "SELL_EUR";
@@ -220,7 +225,7 @@ export function Converter({ book, mode, canReceive, usage }: Props) {
       {state.error && <p className="error" role="alert" style={{ margin: 0 }}>{state.error}</p>}
 
       {mode === "app" && (
-        <details className="advanced">
+        <details className="advanced" open={Boolean(initial?.rate)}>
           <summary>Options avancées : choisir mon propre taux</summary>
           <label className="field">
             <span className="field-label">

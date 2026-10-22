@@ -259,11 +259,16 @@ test("le convertisseur bloque un taux aberrant et exige les coordonnées de réc
   await expect(page.getByText(/publiée au taux de 655,957/)).toBeVisible();
 });
 
-test("Envoyer, Activité et Compte sont trois onglets distincts", async ({ page }) => {
+test("Accueil, Activité et Compte sont trois onglets en bas de l'écran", async ({ page }) => {
   await signUp(page, "onglets");
-  // Envoyer : le convertisseur.
+  // Accueil : le convertisseur ; les onglets sont en bas, même sur ordinateur.
   await expect(page.getByLabel("Montant envoyé")).toBeVisible();
-  await page.getByRole("navigation", { name: "Navigation principale" }).first().getByRole("link", { name: "Activité" }).click();
+  const tabs = page.getByRole("navigation", { name: "Navigation principale" });
+  await expect(tabs).toHaveCount(1);
+  const box = await tabs.boundingBox();
+  expect(box!.y + box!.height).toBeGreaterThan((page.viewportSize()!.height) - 5);
+  await expect(tabs.getByRole("link", { name: "Accueil" })).toHaveAttribute("aria-current", "page");
+  await tabs.getByRole("link", { name: "Activité" }).click();
   await expect(page).toHaveURL(/\/app\/activite$/);
   await expect(page.getByRole("heading", { name: "Mes limites" })).toBeVisible();
   await expect(page.getByText("0 / 2 000 000 XOF").first()).toBeVisible();
@@ -273,6 +278,28 @@ test("Envoyer, Activité et Compte sont trois onglets distincts", async ({ page 
   await expect(page).toHaveURL(/\/app$/);
   await page.goto("/app/ordres");
   await expect(page).toHaveURL(/\/app\/activite$/);
+});
+
+test("depuis Activité, choisir une offre ouvre le convertisseur prérempli et conclut l'échange", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const maker = await (await browser.newContext()).newPage();
+  const taker = await (await browser.newContext()).newPage();
+  await signUp(maker, "offre-a");
+  await fillPaymentDetails(maker, { phone: "+221 77 000 00 08", phoneHolder: "Awa Test" });
+  await placeOrder(maker, { direction: "EUR → XOF", amount: "100", rate: "655" });
+
+  await signUp(taker, "offre-b");
+  await fillPaymentDetails(taker, { iban: EXAMPLE_IBAN, ibanHolder: "Jean Test" });
+  await taker.goto("/app/activite");
+  await expect(taker.getByText("100,00 € disponibles")).toBeVisible();
+  await taker.getByRole("link", { name: /Envoyer 65\s500 XOF/ }).click();
+  await expect(taker).toHaveURL(/\/app\?sens=SELL_XOF/);
+  await expect(taker.getByLabel("Montant envoyé")).toHaveValue(/65\s500/);
+  await expect(taker.getByLabel("Mon taux")).toHaveValue("655");
+  await expect(taker.getByLabel("Montant reçu")).toHaveText("100,00");
+  await taker.getByRole("button", { name: "Échanger maintenant" }).click();
+  await expect(taker).toHaveURL(/\/app\/ordres\//);
+  await expect(taker.getByText("1 partenaire a été trouvé tout de suite.")).toBeVisible();
 });
 
 test("la cloche signale les notifications, puis les marque comme lues", async ({ browser }) => {

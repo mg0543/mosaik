@@ -3,13 +3,14 @@ import Link from "next/link";
 import { StepIcon } from "@/components/illustrations";
 import { LocalDate } from "@/components/local-date";
 import { OrderListItem } from "@/components/orders";
-import { fmtEur, fmtRate, fmtXof, fmtXofNumber } from "@/lib/format";
+import { fmtEur, fmtEurNumber, fmtRate, fmtXof, fmtXofNumber } from "@/lib/format";
+import { marketOffers } from "@/lib/offers";
 import { MAX_DAILY_XOF, MAX_MONTHLY_XOF, remainingAllowance } from "@/lib/policy";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
 import { getVolumeUsage } from "@/server/orders";
 import { getProfile } from "@/server/profiles";
-import { getMarketSnapshot, getMyOrders } from "@/server/queries";
+import { getBookForUser, getMyOrders } from "@/server/queries";
 import { getPendingActions } from "@/server/settlements";
 
 export const metadata: Metadata = { title: "Activité" };
@@ -21,15 +22,16 @@ export const metadata: Metadata = { title: "Activité" };
 export default async function ActivityPage() {
   const user = await requireUser();
   const sql = getSql();
-  const [orders, toDo, profile, market, usage] = await Promise.all([
+  const [orders, toDo, profile, book, usage] = await Promise.all([
     getMyOrders(sql, user.id, 100),
     getPendingActions(sql, user.id),
     getProfile(sql, user.id),
-    getMarketSnapshot(sql, user.id),
+    getBookForUser(sql, user.id),
     getVolumeUsage(sql, user.id),
   ]);
   const inProgress = orders.filter((o) => o.status === "open").length;
   const completed = orders.filter((o) => o.status === "filled").length;
+  const offers = marketOffers(book);
   const openOrders = orders.filter((o) => o.status === "open");
   const closedOrders = orders.filter((o) => o.status !== "open");
 
@@ -66,30 +68,24 @@ export default async function ActivityPage() {
         </section>
       )}
 
-      <section className="card rate-card" aria-labelledby="rate-title">
+      <section className="card" aria-labelledby="offers-title">
         <div className="card-body">
-          <h2 id="rate-title" className="section-title" style={{ marginTop: 0 }}>Taux du moment</h2>
-          <div className="rate-grid">
-            <div>
-              <span className="detail-label">Vous envoyez des euros</span>
-              <strong className="rate-value num">
-                {market.bestXofOffer !== null ? `1 € = ${fmtRate(market.bestXofOffer)} XOF` : "Aucune offre"}
-              </strong>
-              <span className="muted rate-sub">
-                {market.xofAvailable > 0 ? `${fmtXof(market.xofAvailable)} disponibles` : "Votre demande sera publiée au taux officiel"}
-              </span>
-            </div>
-            <div>
-              <span className="detail-label">Vous envoyez des francs CFA</span>
-              <strong className="rate-value num">
-                {market.bestEurOffer !== null ? `1 € = ${fmtRate(market.bestEurOffer)} XOF` : "Aucune offre"}
-              </strong>
-              <span className="muted rate-sub">
-                {market.eurAvailableCents > 0 ? `${fmtEur(market.eurAvailableCents)} disponibles` : "Votre demande sera publiée au taux officiel"}
-              </span>
-            </div>
-          </div>
-          <Link href="/app" className="btn btn-primary btn-lg btn-block">Faire un échange</Link>
+          <h2 id="offers-title" className="section-title" style={{ marginTop: 0 }}>Offres disponibles</h2>
+          <p className="muted" style={{ margin: "0 0 12px", fontSize: 14 }}>
+            Choisissez une offre : le convertisseur s&apos;ouvre à son montant et à son taux. Vous pourrez ajuster le montant.
+          </p>
+          <OfferGroup title="Pour recevoir des francs CFA" empty="Aucune offre de francs CFA pour le moment."
+            offers={offers.forXof.map((o) => ({
+              key: o.seq, headline: `${fmtXof(o.available)} disponibles`, rate: o.rate,
+              cta: `Envoyer ${fmtEur(o.takerAmount)}`,
+              href: `/app?${new URLSearchParams({ sens: o.takerSide, montant: fmtEurNumber(o.takerAmount), taux: fmtRate(o.rate) })}`,
+            }))} />
+          <OfferGroup title="Pour recevoir des euros" empty="Aucune offre d'euros pour le moment."
+            offers={offers.forEur.map((o) => ({
+              key: o.seq, headline: `${fmtEur(o.available)} disponibles`, rate: o.rate,
+              cta: `Envoyer ${fmtXof(o.takerAmount)}`,
+              href: `/app?${new URLSearchParams({ sens: o.takerSide, montant: fmtXofNumber(o.takerAmount), taux: fmtRate(o.rate) })}`,
+            }))} />
         </div>
       </section>
 
@@ -147,6 +143,38 @@ function Gauge({ label, used, max }: { label: string; used: number; max: number 
       <div className="progress" role="img" aria-label={`${label} : ${fmtXofNumber(used)} XOF sur ${fmtXofNumber(max)}`}>
         <div style={{ width: `${pct}%` }} className={pct >= 90 ? "near-limit" : undefined} />
       </div>
+    </div>
+  );
+}
+
+/** Un groupe d'offres : montant disponible, taux, et bouton qui ouvre le convertisseur prérempli. */
+function OfferGroup({
+  title,
+  empty,
+  offers,
+}: {
+  title: string;
+  empty: string;
+  offers: { key: number; headline: string; rate: number; cta: string; href: string }[];
+}) {
+  return (
+    <div className="offer-group">
+      <h3>{title}</h3>
+      {offers.length === 0 ? (
+        <p className="muted offer-empty">{empty}</p>
+      ) : (
+        <ul className="offer-list">
+          {offers.map((o, i) => (
+            <li key={o.key} className="offer">
+              <div>
+                <strong className="num">{o.headline}</strong>
+                <span className="muted num">1 € = {fmtRate(o.rate)} XOF{i === 0 ? " · meilleur taux" : ""}</span>
+              </div>
+              <Link href={o.href} className="btn btn-primary btn-sm">{o.cta}</Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
