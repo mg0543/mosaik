@@ -1,4 +1,4 @@
--- Mosaik : carnet d'ordres EUR / XOF.
+-- MEYA : carnet d'ordres EUR / XOF.
 --
 -- Principes :
 -- - Montants en entiers : centimes d'EUR et XOF entiers (bigint). Taux en millièmes de XOF par EUR.

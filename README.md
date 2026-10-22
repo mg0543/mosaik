@@ -1,7 +1,6 @@
 # MEYA (prototype)
 
-> Anciennement « Mosaik ». Les noms d'infrastructure (dépôt `mosaik`, projet Supabase `mosaik`,
-> adresse `mosaik-ten.vercel.app`) n'ont pas encore été renommés.
+En ligne : https://meya-app.vercel.app (l'ancienne adresse mosaik-ten.vercel.app y redirige).
 
 Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 
@@ -82,7 +81,7 @@ npm run db:reset   # recrée la base à partir des migrations
 Le site est déployé sur Vercel à chaque push sur `main`. Sans base configurée, il affiche
 « pilote bientôt ouvert » et seul le simulateur fonctionne.
 
-État actuel : projet Supabase cloud `mosaik` créé (région Paris), schéma appliqué et droits
+État actuel : projet Supabase cloud (région Paris, référence `yksscigqkfswgcftjllh`), schéma appliqué et droits
 vérifiés sur la base cloud. Le mot de passe de la base est dans `.env.cloud.local`, jamais versionné.
 
 **Dépôt public** : aucun secret ne doit y entrer. Clés et mots de passe vont dans les fichiers

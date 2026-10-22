@@ -1,6 +1,6 @@
 -- Règlement entre participants (pilote, option A) et accès sur invitation.
 --
--- Mosaik ne reçoit, ne détient ni ne transfère aucun fonds : les participants se paient
+-- MEYA ne reçoit, ne détient ni ne transfère aucun fonds : les participants se paient
 -- directement. La plateforme fournit à chacun les coordonnées de sa contrepartie et suit
 -- les confirmations, dans un ordre imposé :
 --   1. le preneur (l'ordre arrivé en dernier) envoie sa part ;

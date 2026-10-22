@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "mosaik"
+project_id = "meya"
 
 [api]
 enabled = true
@@ -416,14 +416,14 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
 # ---------------------------------------------------------------------------
-# Production (projet cloud « mosaik ») : seules ces valeurs diffèrent du local.
+# Production (projet cloud MEYA) : seules ces valeurs diffèrent du local.
 # ---------------------------------------------------------------------------
 [remotes.production]
 project_id = "yksscigqkfswgcftjllh"
 
 [remotes.production.auth]
-site_url = "https://mosaik-ten.vercel.app"
-additional_redirect_urls = ["https://mosaik-ten.vercel.app/auth/confirm"]
+site_url = "https://meya-app.vercel.app"
+additional_redirect_urls = ["https://meya-app.vercel.app/auth/confirm"]
 
 [remotes.production.auth.rate_limit]
 # Limite imposée par l'envoi d'e-mails intégré à Supabase, tant qu'aucun SMTP n'est configuré.
