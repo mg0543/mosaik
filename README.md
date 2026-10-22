@@ -15,7 +15,7 @@ Moteur de matching de liquidité multi-devises EUR ↔ XOF.
   - `policy.ts` : garde-fous (taux à ±15 % de la référence ; 2 000 000 XOF par échange et par jour,
     10 000 000 XOF par mois, alignés sur les limites BCEAO de la monnaie électronique ; 10 demandes
     ouvertes, 30 échanges par heure) ;
-  - `quote.ts` : devis du convertisseur (taux choisi automatiquement) ;
+  - `quote.ts` : devis du convertisseur (taux choisi automatiquement, partie disponible) ;
   - `payment.ts`, `settlement.ts` : coordonnées de réception (IBAN, mobile money) et protocole de règlement ;
   - `preview.ts`, `format.ts`, `order-status.ts` : aperçu, affichage, statuts.
 - `src/server/` : accès à la base et authentification, côté serveur uniquement.
@@ -118,6 +118,18 @@ Dans Supabase > SQL Editor :
 ```sql
 insert into public.pilot_invites (email, note) values ('prenom.nom@exemple.com', 'invité par …');
 ```
+
+## Super admin, notifications et audit
+
+- **Console** `/admin` : vue d'ensemble, utilisateurs (suspendre, réactiver), échanges (annuler une
+  demande ouverte), litiges (trancher, décision définitive), journal d'audit, invitations, système.
+- **Rôle** rangé dans `public.app_roles`, invisible et non modifiable par les clients. Pour l'accorder
+  à un compte existant (SQL Editor) :
+  `insert into public.app_roles (user_id, role) select id, 'super_admin' from auth.users where email = '…';`
+- **Journal d'audit** (`audit_events`) : chaque action importante, en ajout seul (seule exception :
+  l'auteur est anonymisé si son compte est supprimé).
+- **Notifications** (`notifications`) : créées dans la même transaction que l'événement ; cloche et page
+  `/app/notifications`.
 
 ## Règlement entre participants (pilote)
 

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { isBackendConfigured } from "./config";
+import { getSql } from "./db";
+import { isSuperAdmin } from "./roles";
 import { createSupabaseServerClient } from "./supabase";
 
 export interface CurrentUser {
@@ -24,5 +26,12 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 export async function requireUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/connexion");
+  return user;
+}
+
+/** À appeler en tête de chaque page ou action d'administration : redirige sinon. */
+export async function requireAdmin(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (!(await isSuperAdmin(getSql(), user.id))) redirect("/app");
   return user;
 }

@@ -4,7 +4,10 @@ import { placeOrder, type Order, type Side } from "../lib/matching";
 import { createSql } from "./db";
 import { cancelOrderForUser, getVolumeUsage, placeOrderForUser } from "./orders";
 import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders, getPublicBook } from "./queries";
+import { addInvite, adminCancelOrder, getOverview, grantSuperAdmin, listInvites, listUsers, reactivateUser, removeInvite, resolveDispute, suspendUser } from "./admin";
+import { listAuditEvents } from "./audit";
 import { canSignIn, inviteToPilot } from "./invites";
+import { listNotifications, markAllRead, unreadCount } from "./notifications";
 import { getProfile } from "./profiles";
 import { confirmSettlementStep, getPendingActions, openDispute, saveEurDetails, saveXofDetails } from "./settlements";
 
@@ -53,11 +56,12 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await sql`truncate public.settlements, public.trades, public.orders`;
+  await sql`truncate public.settlements, public.trades, public.orders, public.notifications, public.audit_events, public.app_roles`;
+  await sql`update public.profiles set suspended_at = null, suspended_reason = null where user_id in ${sql(Object.values(users))}`;
 });
 
 afterAll(async () => {
-  await sql`truncate public.settlements, public.trades, public.orders`;
+  await sql`truncate public.settlements, public.trades, public.orders, public.notifications, public.audit_events`;
   await sql`delete from public.payment_details where user_id in ${sql(Object.values(users))}`;
   await sql`delete from auth.users where id in ${sql(Object.values(users))}`;
   await sql.end();
@@ -354,12 +358,12 @@ describe("profils", () => {
         insert into auth.users (id, email, aud, role, raw_user_meta_data)
         values (${id}, ${`profil-${id.slice(0, 8)}@exemple.test`}, 'authenticated', 'authenticated', ${sql.json(meta)})
       `;
-      expect(await getProfile(sql, id)).toEqual({ firstName: "Aïssatou", lastName: "N'Diaye", phone: "+221771234567" });
+      expect(await getProfile(sql, id)).toMatchObject({ firstName: "Aïssatou", lastName: "N'Diaye", phone: "+221771234567", suspendedAt: null });
     } finally {
       await sql`delete from auth.users where id = ${id}`;
     }
     // Le profil disparaît avec le compte.
-    expect(await getProfile(sql, id)).toEqual({ firstName: null, lastName: null, phone: null });
+    expect(await getProfile(sql, id)).toMatchObject({ firstName: null, lastName: null, phone: null });
   });
 
   it("refuse tout le compte si les informations sont invalides", async () => {
@@ -426,6 +430,123 @@ describe("plafonds journalier et mensuel", () => {
               date_trunc('month', now() at time zone 'UTC') at time zone 'UTC' - interval '1 day')
     `;
     expect(await getVolumeUsage(sql, users.bob)).toEqual({ today: 655_957, month: 655_957 });
+  });
+});
+
+describe("notifications et journal d'audit", () => {
+  /** Alice attend avec 328 000 XOF à 656 ; Bob arrive et vend 500 €. */
+  async function trade() {
+    const alice = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 328_000, limitRate: 656_000 });
+    const bob = await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
+    const [{ trade_id }] = await sql<{ trade_id: string }[]>`select trade_id from public.settlements`;
+    return { aliceOrder: alice.orderId, bobOrder: bob.orderId, tradeId: trade_id };
+  }
+
+  it("prévient les deux partenaires d'un échange, avec un lien vers leur propre demande", async () => {
+    const { aliceOrder, bobOrder } = await trade();
+    const [toBob] = await listNotifications(sql, users.bob);
+    expect(toBob).toMatchObject({ kind: "trade_matched", title: "Partenaire trouvé", link: `/app/ordres/${bobOrder}#echanges` });
+    expect(toBob.body).toMatch(/envoyez 500,00\s€/);
+    const [toAlice] = await listNotifications(sql, users.alice);
+    expect(toAlice).toMatchObject({ kind: "trade_matched", link: `/app/ordres/${aliceOrder}#echanges` });
+    expect(await unreadCount(sql, users.alice)).toBe(1);
+    expect(await markAllRead(sql, users.alice)).toBe(1);
+    expect(await unreadCount(sql, users.alice)).toBe(0);
+  });
+
+  it("prévient l'autre partenaire à chaque étape, et les administrateurs en cas de litige", async () => {
+    await grantSuperAdmin(sql, users.chloe, null);
+    const { tradeId } = await trade();
+    await markAllRead(sql, users.alice);
+    await confirmSettlementStep(sql, users.bob, tradeId, "taker_sent");
+    expect((await listNotifications(sql, users.alice))[0]).toMatchObject({ kind: "settlement_step", title: "Votre partenaire a envoyé son paiement" });
+
+    await openDispute(sql, users.alice, tradeId, "Je ne vois rien arriver sur mon compte");
+    expect((await listNotifications(sql, users.bob))[0]).toMatchObject({ kind: "dispute_opened", title: "Un problème a été signalé" });
+    expect((await listNotifications(sql, users.chloe))[0]).toMatchObject({ kind: "dispute_opened", link: "/admin/litiges" });
+  });
+
+  it("garde une trace de chaque action, sans coordonnées bancaires", async () => {
+    const { tradeId } = await trade();
+    await confirmSettlementStep(sql, users.bob, tradeId, "taker_sent");
+    await saveEurDetails(sql, users.alice, { iban: EXAMPLE_IBAN, holder: "Test alice" });
+    const actions = (await listAuditEvents(sql)).map((e) => e.action);
+    expect(actions).toEqual(expect.arrayContaining(["order.placed", "settlement.taker_sent", "payment_details.updated"]));
+    const details = (await listAuditEvents(sql, { action: "payment_details" }))[0].details;
+    expect(JSON.stringify(details)).not.toContain("FR76");
+  });
+
+  it("rend le journal inaltérable et invisible des clients, comme les rôles", async () => {
+    await trade();
+    await expect(sql`update public.audit_events set action = 'order.forged'`).rejects.toThrow(/ni modifié ni effacé/);
+    await expect(sql`delete from public.audit_events`).rejects.toThrow(/ni modifié ni effacé/);
+    const asAlice = (q: (tx: typeof sql) => Promise<unknown>) =>
+      sql.begin(async (tx) => {
+        await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: users.alice, role: "authenticated" })}, true)`;
+        await tx`set local role authenticated`;
+        return q(tx as unknown as typeof sql);
+      });
+    await expect(asAlice((tx) => tx`select * from public.audit_events`)).rejects.toThrow(/permission denied/);
+    await expect(asAlice((tx) => tx`select * from public.app_roles`)).rejects.toThrow(/permission denied/);
+    await expect(
+      asAlice((tx) => tx`insert into public.app_roles (user_id, role) values (${users.alice}, 'super_admin')`),
+    ).rejects.toThrow(/permission denied/);
+    const mine = (await asAlice((tx) => tx`select user_id from public.notifications`)) as { user_id: string }[];
+    expect(new Set(mine.map((n) => n.user_id))).toEqual(new Set([users.alice]));
+  });
+});
+
+describe("administration", () => {
+  it("suspend un compte (plus de nouvel échange), le prévient, puis le réactive", async () => {
+    await grantSuperAdmin(sql, users.chloe, null);
+    await expect(suspendUser(sql, users.chloe, users.chloe, "test")).rejects.toThrow(/propre compte/);
+    await suspendUser(sql, users.chloe, users.bob, "Signalements répétés");
+    await expect(
+      placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 10_000, limitRate: 650_000 }),
+    ).rejects.toThrow(/compte est suspendu/);
+    expect((await listNotifications(sql, users.bob))[0]).toMatchObject({ kind: "account_suspended" });
+    await expect(suspendUser(sql, users.dan, users.chloe, "abus")).rejects.toThrow(/administrateur ne peut pas/);
+
+    await reactivateUser(sql, users.chloe, users.bob);
+    await expect(
+      placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 10_000, limitRate: 650_000 }),
+    ).resolves.toBeDefined();
+    expect((await listAuditEvents(sql, { action: "user." })).map((e) => e.action)).toEqual(["user.reactivated", "user.suspended"]);
+  });
+
+  it("annule la demande ouverte d'un utilisateur et le prévient", async () => {
+    const { orderId } = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 });
+    await adminCancelOrder(sql, users.chloe, orderId, "Taux manifestement erroné");
+    expect(await order(orderId)).toMatchObject({ status: "cancelled" });
+    expect((await listNotifications(sql, users.alice))[0]).toMatchObject({ kind: "order_cancelled" });
+    await expect(adminCancelOrder(sql, users.chloe, orderId, "encore")).rejects.toThrow(/plus ouverte/);
+  });
+
+  it("tranche un litige une seule fois, puis le règlement est figé", async () => {
+    await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 328_000, limitRate: 656_000 });
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 50_000, limitRate: 650_000 });
+    const [{ trade_id: tradeId }] = await sql<{ trade_id: string }[]>`select trade_id from public.settlements`;
+    await expect(resolveDispute(sql, users.chloe, tradeId, "completed", "pas de litige")).rejects.toThrow(/déjà tranché ou introuvable/);
+    await openDispute(sql, users.alice, tradeId, "Paiement non reçu après 24 heures");
+    await resolveDispute(sql, users.chloe, tradeId, "failed", "Aucune preuve de paiement fournie par le partenaire");
+    await expect(resolveDispute(sql, users.chloe, tradeId, "completed", "revirement")).rejects.toThrow(/déjà tranché/);
+    await expect(sql`update public.settlements set resolution_note = 'autre'`).rejects.toThrow(/définitivement figé/);
+    expect((await listNotifications(sql, users.bob))[0]).toMatchObject({ kind: "dispute_resolved" });
+  });
+
+  it("donne une vue d'ensemble, la liste des utilisateurs et gère les invitations", async () => {
+    await placeOrderForUser(sql, { userId: users.alice, side: "SELL_EUR", amount: 10_000, limitRate: 700_000 });
+    const overview = await getOverview(sql);
+    expect(overview.openOrders).toBe(1);
+    expect(overview.users).toBeGreaterThanOrEqual(4);
+    const found = await listUsers(sql, { search: "alice-" });
+    expect(found.map((u) => u.id)).toContain(users.alice);
+
+    const email = `invite-${randomUUID().slice(0, 8)}@exemple.test`;
+    await addInvite(sql, users.chloe, email, "pilote");
+    expect((await listInvites(sql)).some((i) => i.email === email && !i.registered)).toBe(true);
+    await removeInvite(sql, users.chloe, email);
+    expect((await listInvites(sql)).some((i) => i.email === email)).toBe(false);
   });
 });
 

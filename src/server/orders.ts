@@ -1,7 +1,10 @@
 import { assertValidOrder, placeOrder, REFERENCE_RATE, type Order, type PlaceOrderResult, type Side } from "../lib/matching";
 import { payToFor, receivedCurrency, type PayTo } from "../lib/payment";
 import { checkActivityPolicy, checkOrderPolicy, checkVolumePolicy, type VolumeUsage } from "../lib/policy";
+import { fmtEur, fmtXof } from "../lib/format";
+import { recordEvent } from "./audit";
 import type { Queryable, Sql } from "./db";
+import { notify } from "./notifications";
 import { getPaymentDetails, getPaymentDetailsOf } from "./settlements";
 
 /**
@@ -11,7 +14,7 @@ import { getPaymentDetails, getPaymentDetailsOf } from "./settlements";
  * Le débit reste largement suffisant pour un pilote ; un verrouillage plus fin ne se
  * justifiera qu'avec un volume bien supérieur.
  */
-const ORDER_BOOK_LOCK = 7_402_113;
+export const ORDER_BOOK_LOCK = 7_402_113;
 
 export interface NewOrderInput {
   userId: string;
@@ -57,6 +60,12 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
   assertValidOrder({ id: "nouvel-ordre", ownerId: userId, side, remaining: amount, limitRate, seq: 0 });
   const refusal = checkOrderPolicy(side, amount, limitRate);
   if (refusal) throw new RangeError(refusal);
+
+  // Un compte suspendu ne peut plus créer d'échange (ses règlements en cours restent accessibles).
+  const [profile] = await sql<{ suspended_at: Date | null }[]>`select suspended_at from public.profiles where user_id = ${userId}`;
+  if (profile?.suspended_at) {
+    throw new RangeError("Votre compte est suspendu : vous ne pouvez plus créer d'échange. Vos règlements en cours restent accessibles.");
+  }
 
   // Sans coordonnée pour recevoir, la contrepartie ne saurait pas où payer.
   const received = receivedCurrency(side);
@@ -168,6 +177,28 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
       `;
     }
 
+    // Trace et notifications, dans la même transaction que l'échange.
+    await recordEvent(tx, {
+      actorId: userId, actorRole: "user", action: "order.placed", entity: "order", entityId: created.id,
+      details: { side, amount, limit_rate: limitRate, trades: result.trades.length, resting: result.resting?.remaining ?? 0 },
+    });
+    for (const t of result.trades) {
+      const takerSends = side === "SELL_XOF" ? fmtXof(t.xof) : fmtEur(t.eurCents);
+      const makerSends = side === "SELL_XOF" ? fmtEur(t.eurCents) : fmtXof(t.xof);
+      await notify(tx, t.takerId, {
+        kind: "trade_matched",
+        title: "Partenaire trouvé",
+        body: `À vous de commencer : envoyez ${takerSends} dans les 24 heures. Les coordonnées sont dans le détail de l'échange.`,
+        link: `/app/ordres/${created.id}#echanges`,
+      });
+      await notify(tx, t.makerId, {
+        kind: "trade_matched",
+        title: "Un partenaire a accepté votre demande",
+        body: `Il doit d'abord vous envoyer ${takerSends}. Vous enverrez ensuite ${makerSends}.`,
+        link: `/app/ordres/${t.makerOrderId}#echanges`,
+      });
+    }
+
     return { orderId: created.id, seq: created.seq, result };
   });
 }
@@ -205,11 +236,16 @@ export async function getVolumeUsage(sql: Queryable, userId: string): Promise<Vo
 export async function cancelOrderForUser(sql: Sql, userId: string, orderId: string): Promise<boolean> {
   return sql.begin(async (tx) => {
     await tx`select pg_advisory_xact_lock(${ORDER_BOOK_LOCK})`;
-    const rows = await tx`
+    const rows = await tx<{ remaining: number }[]>`
       update public.orders set status = 'cancelled'
       where id = ${orderId} and owner_id = ${userId} and status = 'open'
-      returning id
+      returning remaining
     `;
-    return rows.length === 1;
+    if (rows.length !== 1) return false;
+    await recordEvent(tx, {
+      actorId: userId, actorRole: "user", action: "order.cancelled", entity: "order", entityId: orderId,
+      details: { remaining: rows[0].remaining },
+    });
+    return true;
   });
 }

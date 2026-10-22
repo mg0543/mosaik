@@ -22,6 +22,16 @@ export async function invite(email: string): Promise<void> {
   }
 }
 
+/** Accorde le rôle de super administrateur à un compte de test (base locale uniquement). */
+export async function grantAdmin(email: string): Promise<void> {
+  const sql = postgres(process.env.E2E_DATABASE_URL ?? LOCAL_DB, { max: 1 });
+  try {
+    await sql`insert into public.app_roles (user_id, role) select id, 'super_admin' from auth.users where email = ${email} on conflict do nothing`;
+  } finally {
+    await sql.end();
+  }
+}
+
 /** Dernier e-mail reçu par cette adresse dans la boîte de test locale (Mailpit). */
 export async function latestEmail(email: string): Promise<{ text: string; html: string }> {
   for (let attempt = 0; attempt < 40; attempt++) {

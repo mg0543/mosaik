@@ -23,7 +23,7 @@ export async function cancelOrderAction(_prev: CancelState, formData: FormData):
   }
   if (!cancelled) return { error: "Cette demande ne peut plus être annulée : elle a peut-être été servie entre-temps." };
   revalidatePath(`/app/ordres/${orderId}`);
-  revalidatePath("/app/ordres");
+  revalidatePath("/app/activite");
   return {};
 }
 

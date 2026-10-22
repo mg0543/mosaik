@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   codeFromEmail,
+  grantAdmin,
   confirmStep,
   EXAMPLE_IBAN,
   fillPaymentDetails,
@@ -179,7 +180,7 @@ test("deux participants s'échangent des devises et règlent l'échange de bout 
   await expect(pageB.getByText("Votre partenaire doit confirmer qu'il a bien reçu votre paiement.", { exact: false })).toBeVisible();
 
   // 2. Alice voit la tâche sur son accueil, confirme la réception, puis 3. envoie sa part au Wave de Bob.
-  await pageA.goto("/app");
+  await pageA.goto("/app/activite");
   await expect(pageA.getByRole("heading", { name: "À faire (1)" })).toBeVisible();
   await pageA.getByRole("link", { name: /Confirmer une réception/ }).click();
   await expect(pageA).toHaveURL(new RegExp(`^${orderA}`));
@@ -258,14 +259,94 @@ test("le convertisseur bloque un taux aberrant et exige les coordonnées de réc
   await expect(page.getByText(/publiée au taux de 655,957/)).toBeVisible();
 });
 
-test("l'accueil est un tableau de bord, distinct de l'écran Échanger", async ({ page }) => {
-  await signUp(page, "tableau");
+test("Envoyer, Activité et Compte sont trois onglets distincts", async ({ page }) => {
+  await signUp(page, "onglets");
+  // Envoyer : le convertisseur.
+  await expect(page.getByLabel("Montant envoyé")).toBeVisible();
+  await page.getByRole("navigation", { name: "Navigation principale" }).first().getByRole("link", { name: "Activité" }).click();
+  await expect(page).toHaveURL(/\/app\/activite$/);
   await expect(page.getByRole("heading", { name: "Mes limites" })).toBeVisible();
   await expect(page.getByText("0 / 2 000 000 XOF").first()).toBeVisible();
   await expect(page.getByLabel("Montant envoyé")).toHaveCount(0);
-  await page.getByRole("link", { name: "Faire un échange" }).click();
-  await expect(page).toHaveURL(/\/app\/echanger$/);
-  await expect(page.getByLabel("Montant envoyé")).toBeVisible();
+  // Les anciennes adresses redirigent.
+  await page.goto("/app/echanger");
+  await expect(page).toHaveURL(/\/app$/);
+  await page.goto("/app/ordres");
+  await expect(page).toHaveURL(/\/app\/activite$/);
+});
+
+test("la cloche signale les notifications, puis les marque comme lues", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const maker = await (await browser.newContext()).newPage();
+  const taker = await (await browser.newContext()).newPage();
+  await signUp(maker, "cloche-a");
+  await fillPaymentDetails(maker, { phone: "+221 77 000 00 05", phoneHolder: "Awa Test" });
+  await placeOrder(maker, { direction: "EUR → XOF", amount: "100", rate: "660" });
+  await signUp(taker, "cloche-b");
+  await fillPaymentDetails(taker, { iban: EXAMPLE_IBAN, ibanHolder: "Jean Test" });
+  await placeOrder(taker, { direction: "XOF → EUR", amount: "66 000", rate: "670" });
+
+  await maker.goto("/app");
+  const bell = maker.getByRole("link", { name: /Notifications : 1 non lue/ });
+  await expect(bell).toBeVisible();
+  await bell.click();
+  await expect(maker.getByText("Un partenaire a accepté votre demande")).toBeVisible();
+  await expect(maker.getByRole("link", { name: "Notifications", exact: true })).toBeVisible();
+});
+
+test("propose de n'échanger que la partie disponible", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const maker = await (await browser.newContext()).newPage();
+  const taker = await (await browser.newContext()).newPage();
+  await signUp(maker, "partiel-a");
+  await fillPaymentDetails(maker, { phone: "+221 77 000 00 06", phoneHolder: "Awa Test" });
+  await placeOrder(maker, { direction: "EUR → XOF", amount: "100", rate: "655" });
+
+  await signUp(taker, "partiel-b");
+  await fillPaymentDetails(taker, { iban: EXAMPLE_IBAN, ibanHolder: "Jean Test" });
+  await taker.goto("/app");
+  await taker.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await taker.getByLabel("Montant envoyé").fill("100 000");
+  await expect(taker.getByText("Il n'y a pas de partenaire pour tout le montant.")).toBeVisible();
+  await taker.getByRole("radio", { name: /Seulement la partie disponible/ }).check();
+  await taker.getByRole("button", { name: /Échanger 65\s500 XOF maintenant/ }).click();
+  await expect(taker).toHaveURL(/\/app\/ordres\//);
+  await expect(taker.getByText("Servi", { exact: true })).toBeVisible();
+  await expect(taker.getByText(/Vous envoyez\s*65\s500 XOF/)).toBeVisible();
+});
+
+test("la console super admin est réservée, et une suspension y est appliquée", async ({ browser }) => {
+  test.setTimeout(60_000);
+  const userPage = await (await browser.newContext()).newPage();
+  const user = await signUp(userPage, "suspendu");
+  await userPage.goto("/admin");
+  await expect(userPage).toHaveURL(/\/app$/);
+
+  const adminPage = await (await browser.newContext()).newPage();
+  const admin = await signUp(adminPage, "superadmin");
+  await grantAdmin(admin.email);
+  await adminPage.goto("/app");
+  await adminPage.getByRole("link", { name: "Admin" }).click();
+  await expect(adminPage.getByRole("heading", { name: "Vue d'ensemble" })).toBeVisible();
+
+  await adminPage.goto(`/admin/utilisateurs?q=${encodeURIComponent(user.email)}`);
+  await adminPage.getByRole("button", { name: "Suspendre" }).click();
+  await adminPage.getByLabel("Motif de la suspension").fill("Vérification en cours");
+  await adminPage.getByRole("button", { name: "Confirmer la suspension" }).click();
+  await expect(adminPage.getByText("Compte suspendu.")).toBeVisible();
+
+  await userPage.goto("/app");
+  await expect(userPage.getByText("Votre compte est suspendu.")).toBeVisible();
+  await adminPage.goto("/admin/audit");
+  await expect(adminPage.getByRole("cell", { name: "Compte suspendu" })).toBeVisible();
+});
+
+test("l'écran d'ouverture apparaît à la première visite, puis plus pendant la visite", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".splash")).toBeAttached();
+  await expect(page.locator("html")).not.toHaveClass(/no-splash/);
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/no-splash/);
 });
 
 test("le convertisseur affiche et applique les plafonds", async ({ page }) => {

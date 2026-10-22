@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { checkPassword, parseEmail, parseName, parseOptionalPhone } from "@/lib/account";
 import { isBackendConfigured, isInviteOnly, siteUrl } from "@/server/config";
 import { getSql } from "@/server/db";
+import { recordEvent } from "@/server/audit";
 import { canSignIn } from "@/server/invites";
 import { createSupabaseServerClient } from "@/server/supabase";
 
@@ -90,6 +91,9 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     return { error: "L'inscription a échoué. Réessayez dans un instant.", fields };
   }
 
+  if (data.user) {
+    await recordEvent(getSql(), { actorId: data.user.id, actorRole: "user", action: "user.signed_up", entity: "user", entityId: data.user.id });
+  }
   // Confirmation d'adresse désactivée : le compte est ouvert tout de suite.
   if (data.session) redirect("/app");
   // Sinon, un e-mail de confirmation est parti (message identique si l'adresse existait déjà).
@@ -112,8 +116,13 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
   if (!email || !password) return { error: "Saisissez votre adresse e-mail et votre mot de passe.", email };
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
+    // Trace de sécurité : les tentatives échouées alimentent le centre d'audit.
+    await recordEvent(getSql(), {
+      actorId: null, actorRole: "system", action: "user.sign_in_failed", entity: "user", entityId: null,
+      details: { email, reason: error.code ?? "inconnue" },
+    }).catch((e) => console.error("Trace de connexion impossible", e));
     if (isRateLimited(error)) return { error: TOO_MANY, email };
     if (error.code === "email_not_confirmed") {
       return { error: "Confirmez d'abord votre adresse avec le lien reçu par e-mail.", email };
@@ -121,6 +130,7 @@ export async function signInAction(_prev: SignInState, formData: FormData): Prom
     // Même message que l'adresse existe ou non : on ne révèle pas qui est inscrit.
     return { error: "Adresse e-mail ou mot de passe incorrect.", email };
   }
+  await recordEvent(getSql(), { actorId: data.user.id, actorRole: "user", action: "user.signed_in", entity: "user", entityId: data.user.id });
   redirect("/app");
 }
 
@@ -184,7 +194,11 @@ export async function resetPasswordAction(_prev: ResetState, formData: FormData)
 export async function signOutAction(): Promise<void> {
   if (isBackendConfigured()) {
     const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getUser();
     await supabase.auth.signOut();
+    if (data.user) {
+      await recordEvent(getSql(), { actorId: data.user.id, actorRole: "user", action: "user.signed_out", entity: "user", entityId: data.user.id });
+    }
   }
   redirect("/");
 }

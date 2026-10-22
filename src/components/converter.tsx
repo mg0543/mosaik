@@ -31,6 +31,8 @@ type Estimate =
   | {
       kind: "ok";
       limitRate: number;
+      /** Ce qui part tout de suite (devise envoyée) et ce qui arrive tout de suite (devise reçue). */
+      givenNow: number;
       receivedNow: number;
       total: number;
       partners: number;
@@ -63,7 +65,7 @@ function estimate(book: PublicBookEntry[], side: Side, amountInput: string, cust
       const waiting = r.resting?.remaining ?? 0;
       const waitingReceives = side === "SELL_XOF" ? eurCentsForXof(waiting, limitRate) : xofForEurCents(waiting, limitRate);
       return {
-        kind: "ok", limitRate, receivedNow: r.received, total: r.received + waitingReceives, partners: r.trades.length,
+        kind: "ok", limitRate, givenNow: r.given, receivedNow: r.received, total: r.received + waitingReceives, partners: r.trades.length,
         waiting, displayRate: r.trades.length > 0 ? averageRate(r.trades) : limitRate, custom: true,
       };
     }
@@ -72,7 +74,7 @@ function estimate(book: PublicBookEntry[], side: Side, amountInput: string, cust
     if (refusal) return { kind: "error", message: refusal };
     const q = quote(book, side, amount);
     return {
-      kind: "ok", limitRate: q.limitRate, receivedNow: q.result.received, total: q.totalEstimate,
+      kind: "ok", limitRate: q.limitRate, givenNow: q.result.given, receivedNow: q.result.received, total: q.totalEstimate,
       partners: q.result.trades.length, waiting: q.waiting,
       displayRate: q.result.trades.length > 0 ? averageRate(q.result.trades) : q.limitRate, custom: false,
     };
@@ -86,11 +88,18 @@ export function Converter({ book, mode, canReceive, usage }: Props) {
   const [side, setSide] = useState<Side>("SELL_EUR");
   const [amounts, setAmounts] = useState<Record<Side, string>>({ SELL_EUR: "500", SELL_XOF: "300 000" });
   const [customRate, setCustomRate] = useState("");
+  // Matching partiel : ne prendre que ce qui est disponible tout de suite, sans rien laisser en attente.
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
   const sendEur = side === "SELL_EUR";
   const amountInput = amounts[side];
   const est = estimate(book, side, amountInput, customRate, usage);
   const money = (receiving: boolean, n: number) => ((sendEur ? !receiving : receiving) ? fmtEur(n) : fmtXof(n));
   const missingDetails = mode === "app" && canReceive !== undefined && !canReceive[side];
+  const partial = est.kind === "ok" && est.partners > 0 && est.waiting > 0;
+  const takeOnlyAvailable = partial && onlyAvailable;
+  // Montant réellement envoyé au serveur : tout, ou seulement la partie servie tout de suite.
+  const submittedAmount =
+    takeOnlyAvailable && est.kind === "ok" ? (sendEur ? fmtEurNumber(est.givenNow) : String(est.givenNow)) : amountInput;
 
   function switchSide(next: Side) {
     setSide(next);
@@ -100,7 +109,7 @@ export function Converter({ book, mode, canReceive, usage }: Props) {
   return (
     <form action={action} className="converter" aria-label="Convertisseur">
       <input type="hidden" name="side" value={side} />
-      <input type="hidden" name="amount" value={amountInput} />
+      <input type="hidden" name="amount" value={submittedAmount} />
       <input type="hidden" name="rate" value={est.kind === "ok" ? fmtRate(est.limitRate) : ""} />
 
       <div className="direction" role="group" aria-label="Ce que vous envoyez">
@@ -141,14 +150,41 @@ export function Converter({ book, mode, canReceive, usage }: Props) {
         <ul className="quote-facts">
           <li><span>Taux</span><strong className="num">1 € = {fmtRate(est.displayRate)} XOF</strong></li>
           <li><span>Frais MEYA</span><strong>0 pendant le pilote</strong></li>
-          <li className={est.waiting === 0 ? "ok" : "pending"}>
+          {/* Dans l'application, le choix « tout / partie disponible » remplace ce message. */}
+          {!(mode === "app" && partial) && <li className={est.waiting === 0 ? "ok" : "pending"}>
             {est.waiting === 0
               ? `Disponible maintenant : ${est.partners} partenaire${est.partners > 1 ? "s" : ""} prêt${est.partners > 1 ? "s" : ""} à échanger.`
               : est.partners > 0
                 ? `${money(true, est.receivedNow)} tout de suite ; le reste (${money(false, est.waiting)}) dès qu'un partenaire accepte le taux de ${fmtRate(est.limitRate)}.`
                 : `Aucun partenaire disponible à l'instant : votre demande sera publiée au taux de ${fmtRate(est.limitRate)} et servie dès qu'une personne correspond.`}
-          </li>
+          </li>}
         </ul>
+      )}
+
+      {mode === "app" && partial && est.kind === "ok" && (
+        <fieldset className="partial-choice">
+          <legend>Il n&apos;y a pas de partenaire pour tout le montant. Que voulez-vous faire ?</legend>
+          <label className={!onlyAvailable ? "selected" : undefined}>
+            <input type="radio" name="partial" checked={!onlyAvailable} onChange={() => setOnlyAvailable(false)} />
+            <span>
+              <strong>Tout échanger</strong>
+              <span>
+                {money(true, est.receivedNow)} tout de suite ; le reste ({money(false, est.waiting)}) attend un
+                partenaire au taux de {fmtRate(est.limitRate)}.
+              </span>
+            </span>
+          </label>
+          <label className={onlyAvailable ? "selected" : undefined}>
+            <input type="radio" name="partial" checked={onlyAvailable} onChange={() => setOnlyAvailable(true)} />
+            <span>
+              <strong>Seulement la partie disponible</strong>
+              <span>
+                Échanger {money(false, est.givenNow)} contre {money(true, est.receivedNow)} maintenant ; rien ne reste
+                en attente.
+              </span>
+            </span>
+          </label>
+        </fieldset>
       )}
 
       {missingDetails && (
@@ -172,7 +208,13 @@ export function Converter({ book, mode, canReceive, usage }: Props) {
       ) : (
         <button type="submit" className="btn btn-primary btn-lg btn-block"
           disabled={pending || est.kind !== "ok" || missingDetails}>
-          {pending ? "Enregistrement…" : est.kind === "ok" && est.partners === 0 ? "Publier ma demande" : "Échanger maintenant"}
+          {pending
+            ? "Enregistrement…"
+            : est.kind === "ok" && est.partners === 0
+              ? "Publier ma demande"
+              : takeOnlyAvailable && est.kind === "ok"
+                ? `Échanger ${money(false, est.givenNow)} maintenant`
+                : "Échanger maintenant"}
         </button>
       )}
       {state.error && <p className="error" role="alert" style={{ margin: 0 }}>{state.error}</p>}

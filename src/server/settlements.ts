@@ -1,6 +1,9 @@
 import { parseHolder, parseIban, parseXofPhone, type PaymentDetails, type XofOperator } from "../lib/payment";
 import type { SettlementRole, SettlementStep } from "../lib/settlement";
+import { fmtEur, fmtXof } from "../lib/format";
+import { recordEvent } from "./audit";
 import type { Queryable, Sql } from "./db";
+import { notify } from "./notifications";
 
 /**
  * Coordonnées de réception et suivi du règlement entre participants.
@@ -40,6 +43,7 @@ export async function saveEurDetails(sql: Sql, userId: string, input: { iban: st
     insert into public.payment_details (user_id, eur_iban, eur_holder) values (${userId}, ${iban}, ${holder})
     on conflict (user_id) do update set eur_iban = excluded.eur_iban, eur_holder = excluded.eur_holder
   `;
+  await recordEvent(sql, { actorId: userId, actorRole: "user", action: "payment_details.updated", entity: "user", entityId: userId, details: { currency: "EUR" } });
 }
 
 /** Enregistre les coordonnées pour recevoir des XOF (numéro mobile money de la zone XOF). */
@@ -56,6 +60,7 @@ export async function saveXofDetails(
     on conflict (user_id) do update
       set xof_operator = excluded.xof_operator, xof_phone = excluded.xof_phone, xof_holder = excluded.xof_holder
   `;
+  await recordEvent(sql, { actorId: userId, actorRole: "user", action: "payment_details.updated", entity: "user", entityId: userId, details: { currency: "XOF", operator: input.operator } });
 }
 
 const STEP_RULES: Record<SettlementStep, { actor: SettlementRole; column: string; requires: string | null }> = {
@@ -73,16 +78,56 @@ const STEP_RULES: Record<SettlementStep, { actor: SettlementRole; column: string
 export async function confirmSettlementStep(sql: Sql, userId: string, tradeId: string, step: SettlementStep): Promise<boolean> {
   const rule = STEP_RULES[step];
   if (!rule || !isUuid(tradeId)) return false;
-  const rows = await sql`
-    update public.settlements set ${sql(rule.column)} = now()
-    where trade_id = ${tradeId}
-      and ${sql(rule.actor === "taker" ? "taker_id" : "maker_id")} = ${userId}
-      and ${sql(rule.column)} is null
-      ${rule.requires ? sql`and ${sql(rule.requires)} is not null` : sql``}
-      and disputed_at is null
-    returning trade_id
-  `;
-  return rows.length === 1;
+  return sql.begin(async (tx) => {
+    const rows = await tx<SettlementParties[]>`
+      update public.settlements s set ${tx(rule.column)} = now()
+      from public.trades t
+      where s.trade_id = ${tradeId} and t.id = s.trade_id
+        and s.${tx(rule.actor === "taker" ? "taker_id" : "maker_id")} = ${userId}
+        and s.${tx(rule.column)} is null
+        ${rule.requires ? tx`and s.${tx(rule.requires)} is not null` : tx``}
+        and s.disputed_at is null
+      returning s.taker_id, s.maker_id, s.taker_currency, s.taker_amount, s.maker_amount,
+                t.taker_order_id, t.maker_order_id
+    `;
+    if (rows.length !== 1) return false;
+    const r = rows[0];
+    await recordEvent(tx, { actorId: userId, actorRole: "user", action: `settlement.${step}`, entity: "trade", entityId: tradeId });
+    const n = stepNotification(step, r);
+    await notify(tx, n.userId, n.notification);
+    return true;
+  });
+}
+
+interface SettlementParties {
+  taker_id: string;
+  maker_id: string;
+  taker_currency: "EUR" | "XOF";
+  taker_amount: number;
+  maker_amount: number;
+  taker_order_id: string;
+  maker_order_id: string;
+}
+
+const money = (currency: "EUR" | "XOF", amount: number) => (currency === "EUR" ? fmtEur(amount) : fmtXof(amount));
+
+/** Notification destinée à l'autre partenaire après une étape confirmée. */
+function stepNotification(step: SettlementStep, r: SettlementParties) {
+  const makerCurrency = r.taker_currency === "EUR" ? "XOF" : "EUR";
+  const takerPays = money(r.taker_currency, r.taker_amount);
+  const makerPays = money(makerCurrency, r.maker_amount);
+  const toMaker = `/app/ordres/${r.maker_order_id}#echanges`;
+  const toTaker = `/app/ordres/${r.taker_order_id}#echanges`;
+  switch (step) {
+    case "taker_sent":
+      return { userId: r.maker_id, notification: { kind: "settlement_step" as const, title: "Votre partenaire a envoyé son paiement", body: `Vérifiez que vous avez bien reçu ${takerPays}, puis confirmez la réception.`, link: toMaker } };
+    case "maker_received":
+      return { userId: r.taker_id, notification: { kind: "settlement_step" as const, title: "Votre paiement est bien arrivé", body: `Votre partenaire a confirmé la réception. Il va maintenant vous envoyer ${makerPays}.`, link: toTaker } };
+    case "maker_sent":
+      return { userId: r.taker_id, notification: { kind: "settlement_step" as const, title: "Votre partenaire vous a payé", body: `Vérifiez que vous avez bien reçu ${makerPays}, puis confirmez la réception.`, link: toTaker } };
+    case "taker_received":
+      return { userId: r.maker_id, notification: { kind: "settlement_done" as const, title: "Échange réglé", body: `Votre partenaire a confirmé avoir reçu ${makerPays}. L'échange est terminé.`, link: toMaker } };
+  }
 }
 
 /** Signale un litige sur un règlement non terminé ; le règlement est alors gelé. */
@@ -90,16 +135,40 @@ export async function openDispute(sql: Sql, userId: string, tradeId: string, rea
   const text = reason.replace(/\s+/g, " ").trim();
   if (text.length < 5 || text.length > 500) throw new RangeError("Décrivez le problème en 5 à 500 caractères.");
   if (!isUuid(tradeId)) return false;
-  const rows = await sql`
-    update public.settlements
-    set disputed_at = now(), disputed_by = ${userId}, dispute_reason = ${text}
-    where trade_id = ${tradeId}
-      and (taker_id = ${userId} or maker_id = ${userId})
-      and disputed_at is null
-      and taker_received_at is null
-    returning trade_id
-  `;
-  return rows.length === 1;
+  return sql.begin(async (tx) => {
+    const rows = await tx<SettlementParties[]>`
+      update public.settlements s
+      set disputed_at = now(), disputed_by = ${userId}, dispute_reason = ${text}
+      from public.trades t
+      where s.trade_id = ${tradeId} and t.id = s.trade_id
+        and (s.taker_id = ${userId} or s.maker_id = ${userId})
+        and s.disputed_at is null
+        and s.taker_received_at is null
+      returning s.taker_id, s.maker_id, s.taker_currency, s.taker_amount, s.maker_amount,
+                t.taker_order_id, t.maker_order_id
+    `;
+    if (rows.length !== 1) return false;
+    const r = rows[0];
+    await recordEvent(tx, { actorId: userId, actorRole: "user", action: "dispute.opened", entity: "trade", entityId: tradeId, details: { reason: text } });
+    const otherIsMaker = r.taker_id === userId;
+    await notify(tx, otherIsMaker ? r.maker_id : r.taker_id, {
+      kind: "dispute_opened",
+      title: "Un problème a été signalé",
+      body: "Votre partenaire a signalé un problème sur un échange. Le règlement est gelé le temps que l'équipe l'examine.",
+      link: `/app/ordres/${otherIsMaker ? r.maker_order_id : r.taker_order_id}#echanges`,
+    });
+    // Les administrateurs sont prévenus pour trancher.
+    const admins = await tx<{ user_id: string }[]>`select user_id from public.app_roles where role = 'super_admin'`;
+    for (const admin of admins) {
+      await notify(tx, admin.user_id, {
+        kind: "dispute_opened",
+        title: "Nouveau litige à trancher",
+        body: `Référence ${tradeId.slice(0, 8).toUpperCase()} : « ${text.slice(0, 200)} »`,
+        link: "/admin/litiges",
+      });
+    }
+    return true;
+  });
 }
 
 export interface PendingAction {

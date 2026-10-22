@@ -37,6 +37,15 @@ export default function PrivacyPage() {
           servent ni à la publicité ni à la mesure d&apos;audience.
         </li>
         <li>
+          <strong>Un journal des actions et des connexions</strong> : inscriptions, connexions (y compris les
+          tentatives échouées, avec l&apos;adresse saisie), échanges, étapes de règlement, litiges et décisions de
+          l&apos;équipe. Il sert à la sécurité et au règlement des litiges ; il ne contient ni mot de passe ni
+          coordonnées bancaires.
+        </li>
+        <li>
+          <strong>Vos notifications</strong> dans l&apos;application (partenaire trouvé, paiement reçu, litige…).
+        </li>
+        <li>
           <strong>Des journaux techniques</strong> tenus par nos hébergeurs (adresse IP, date et heure des
           requêtes), pour la sécurité et le bon fonctionnement du service.
         </li>

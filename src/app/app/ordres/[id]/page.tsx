@@ -31,7 +31,7 @@ export default async function OrderPage({
 
   return (
     <div className="app-page">
-      <Link href="/app/ordres" className="back-link">← Mes échanges</Link>
+      <Link href="/app/activite" className="back-link">← Activité</Link>
 
       {nouveau && (
         <div className="notice success" role="status">

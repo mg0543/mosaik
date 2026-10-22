@@ -6,11 +6,11 @@ test("sur mobile, la barre d'onglets remplace la navigation et rien ne déborde"
 
   const tabbar = page.getByRole("navigation", { name: "Navigation principale" }).last();
   await expect(tabbar).toBeVisible();
-  await tabbar.getByRole("link", { name: "Échanger" }).click();
-  await expect(page).toHaveURL(/\/app\/echanger$/);
-  await expect(tabbar.getByRole("link", { name: "Échanger" })).toHaveAttribute("aria-current", "page");
+  await tabbar.getByRole("link", { name: "Activité" }).click();
+  await expect(page).toHaveURL(/\/app\/activite$/);
+  await expect(tabbar.getByRole("link", { name: "Activité" })).toHaveAttribute("aria-current", "page");
 
-  for (const path of ["/", "/connexion", "/inscription", "/app", "/app/echanger", "/app/ordres", "/app/compte", "/simulateur"]) {
+  for (const path of ["/", "/connexion", "/inscription", "/app", "/app/activite", "/app/notifications", "/app/compte", "/simulateur"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, `débordement horizontal sur ${path}`).toBeLessThanOrEqual(0);

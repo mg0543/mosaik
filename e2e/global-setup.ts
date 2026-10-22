@@ -14,7 +14,7 @@ export default async function globalSetup() {
   }
   const sql = postgres(url, { max: 1 });
   try {
-    await sql`truncate public.settlements, public.trades, public.orders`;
+    await sql`truncate public.settlements, public.trades, public.orders, public.notifications, public.audit_events`;
     await sql`delete from public.payment_details where user_id in (select id from auth.users where email like 'e2e-%@exemple.test')`;
     await sql`delete from public.pilot_invites where email like 'e2e-%@exemple.test'`;
     await sql`delete from auth.users where email like 'e2e-%@exemple.test'`;
