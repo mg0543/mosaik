@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { signOutAction } from "@/app/(site)/connexion/actions";
-import { MAX_OPEN_ORDERS, MAX_ORDER_XOF, RATE_BAND_PCT } from "@/lib/policy";
+import { MAX_DAILY_XOF, MAX_MONTHLY_XOF, MAX_OPEN_ORDERS, MAX_ORDER_XOF, RATE_BAND_PCT } from "@/lib/policy";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
 import { getProfile } from "@/server/profiles";
@@ -46,7 +46,11 @@ export default async function AccountPage() {
         <div className="card-body">
           <h2 className="section-title" style={{ marginTop: 0 }}>Règles du pilote</h2>
           <ul className="plain-list">
-            <li>Montant maximal par échange : {MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF ou l&apos;équivalent en euros.</li>
+            <li>
+              Jusqu&apos;à {MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF par échange et {MAX_DAILY_XOF.toLocaleString("fr-FR")} XOF par
+              jour, {MAX_MONTHLY_XOF.toLocaleString("fr-FR")} XOF par mois (ou l&apos;équivalent en euros), conformément aux limites
+              des comptes mobile money fixées par la BCEAO.
+            </li>
             <li>Au plus {MAX_OPEN_ORDERS} demandes en attente à la fois.</li>
             <li>Taux limite compris à ±{RATE_BAND_PCT} % du taux de référence, pour éviter les fautes de frappe.</li>
             <li>Vous payez et êtes payé directement par vos partenaires ; aucun argent ne transite par MEYA.</li>

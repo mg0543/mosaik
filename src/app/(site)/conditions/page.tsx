@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DraftNotice, Todo } from "@/components/legal";
-import { MAX_OPEN_ORDERS, MAX_ORDER_XOF, MAX_ORDERS_PER_HOUR, RATE_BAND_PCT } from "@/lib/policy";
+import { MAX_DAILY_XOF, MAX_MONTHLY_XOF, MAX_OPEN_ORDERS, MAX_ORDER_XOF, MAX_ORDERS_PER_HOUR, RATE_BAND_PCT } from "@/lib/policy";
 
 export const metadata: Metadata = { title: "Conditions du pilote" };
 
@@ -48,7 +48,12 @@ export default function TermsPage() {
 
       <h2>4. Limites du pilote</h2>
       <ul>
-        <li>Montant maximal par ordre : {MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF ou l&apos;équivalent en euros.</li>
+        <li>
+          Montant maximal : {MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF par échange, {MAX_DAILY_XOF.toLocaleString("fr-FR")} XOF par jour
+          et {MAX_MONTHLY_XOF.toLocaleString("fr-FR")} XOF par mois et par participant, ou l&apos;équivalent en euros au taux officiel.
+          Ces plafonds suivent les limites applicables aux comptes de monnaie électronique dans l&apos;UEMOA.{" "}
+          <Todo>validation des plafonds au regard de la réglementation des changes et LBC/FT</Todo>
+        </li>
         <li>Taux limite compris à ±{RATE_BAND_PCT} % du taux de référence (1 € = 655,957 XOF).</li>
         <li>Au plus {MAX_OPEN_ORDERS} ordres en attente et {MAX_ORDERS_PER_HOUR} ordres par heure par participant.</li>
       </ul>

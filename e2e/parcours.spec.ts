@@ -149,6 +149,8 @@ test.describe("compte", () => {
 });
 
 test("deux participants s'échangent des devises et règlent l'échange de bout en bout", async ({ browser }) => {
+  // Parcours à deux utilisateurs en plusieurs étapes : plus long que la limite par défaut.
+  test.setTimeout(60_000);
   const alice = await browser.newContext();
   const bob = await browser.newContext();
   const pageA = await alice.newPage();
@@ -211,6 +213,8 @@ test("deux participants s'échangent des devises et règlent l'échange de bout 
 });
 
 test("un litige gèle le règlement", async ({ browser }) => {
+  // Parcours à deux utilisateurs en plusieurs étapes : plus long que la limite par défaut.
+  test.setTimeout(60_000);
   const maker = await (await browser.newContext()).newPage();
   const taker = await (await browser.newContext()).newPage();
 
@@ -252,6 +256,28 @@ test("le convertisseur bloque un taux aberrant et exige les coordonnées de réc
   await expect(page.getByRole("button", { name: "Publier ma demande" })).toBeEnabled();
   // Sans offre, MEYA propose le taux officiel.
   await expect(page.getByText(/publiée au taux de 655,957/)).toBeVisible();
+});
+
+test("l'accueil est un tableau de bord, distinct de l'écran Échanger", async ({ page }) => {
+  await signUp(page, "tableau");
+  await expect(page.getByRole("heading", { name: "Mes limites" })).toBeVisible();
+  await expect(page.getByText("0 / 2 000 000 XOF").first()).toBeVisible();
+  await expect(page.getByLabel("Montant envoyé")).toHaveCount(0);
+  await page.getByRole("link", { name: "Faire un échange" }).click();
+  await expect(page).toHaveURL(/\/app\/echanger$/);
+  await expect(page.getByLabel("Montant envoyé")).toBeVisible();
+});
+
+test("le convertisseur affiche et applique les plafonds", async ({ page }) => {
+  await signUp(page, "plafonds");
+  await page.goto("/app/echanger");
+  await expect(page.getByText(/Vous pouvez encore échanger 2\s000\s000 XOF aujourd'hui/)).toBeVisible();
+  await page.getByRole("button", { name: "J'envoie des francs CFA" }).click();
+  await page.getByLabel("Montant envoyé").fill("2 000 001");
+  await expect(page.getByText(/Montant trop élevé : 2\s000\s000 XOF au plus par échange/)).toBeVisible();
+  await page.getByRole("button", { name: "J'envoie des euros" }).click();
+  await page.getByLabel("Montant envoyé").fill("3 100");
+  await expect(page.getByText(/Montant trop élevé/)).toBeVisible();
 });
 
 test("l'introduction s'affiche au premier lancement, puis plus jamais", async ({ page }) => {

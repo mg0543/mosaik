@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { placeOrder, type Order, type Side } from "../lib/matching";
 import { createSql } from "./db";
-import { cancelOrderForUser, placeOrderForUser } from "./orders";
+import { cancelOrderForUser, getVolumeUsage, placeOrderForUser } from "./orders";
 import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders, getPublicBook } from "./queries";
 import { canSignIn, inviteToPilot } from "./invites";
 import { getProfile } from "./profiles";
@@ -146,7 +146,7 @@ describe("limites d'activité", () => {
       placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 100_000, limitRate: 6_559_000 }),
     ).rejects.toThrow(/Taux hors limites/);
     await expect(
-      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 500_001, limitRate: 655_957 }),
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 2_000_001, limitRate: 655_957 }),
     ).rejects.toThrow(/Montant trop élevé/);
     expect(await allOrders()).toHaveLength(0);
   });
@@ -404,6 +404,31 @@ describe("pilote sur invitation", () => {
   });
 });
 
+describe("plafonds journalier et mensuel", () => {
+  it("refuse ce qui dépasse le plafond du jour, et libère la part non échangée d'une demande annulée", async () => {
+    const first = await placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 1_500_000, limitRate: 600_000 });
+    await expect(
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 600_000, limitRate: 600_000 }),
+    ).rejects.toThrow(/dépasse votre plafond journalier.*il vous reste 500\s000 XOF aujourd'hui/);
+
+    // Annulée sans avoir été servie, la première demande ne compte plus.
+    await cancelOrderForUser(sql, users.alice, first.orderId);
+    await expect(
+      placeOrderForUser(sql, { userId: users.alice, side: "SELL_XOF", amount: 600_000, limitRate: 600_000 }),
+    ).resolves.toBeDefined();
+  });
+
+  it("compte les euros au taux officiel, et ignore les mois précédents", async () => {
+    await placeOrderForUser(sql, { userId: users.bob, side: "SELL_EUR", amount: 100_000, limitRate: 700_000 }); // 1 000 €
+    await sql`
+      insert into public.orders (owner_id, side, amount, remaining, limit_rate, status, created_at)
+      values (${users.bob}, 'SELL_XOF', 1500000, 0, 655957, 'filled',
+              date_trunc('month', now() at time zone 'UTC') at time zone 'UTC' - interval '1 day')
+    `;
+    expect(await getVolumeUsage(sql, users.bob)).toEqual({ today: 655_957, month: 655_957 });
+  });
+});
+
 describe("cancelOrderForUser", () => {
   it("annule son propre ordre ouvert, qui n'est plus apparié ensuite", async () => {
     const { orderId } = await placeOrderForUser(sql, {
@@ -430,6 +455,10 @@ describe("requêtes des écrans", () => {
 
     expect(await getMarketSnapshot(sql)).toEqual({
       bestEurOffer: 657_000, eurAvailableCents: 100_000, bestXofOffer: 650_000, xofAvailable: 300_000,
+    });
+    // Vu par Bob, sa propre offre n'apparaît pas : il ne peut pas échanger avec lui-même.
+    expect(await getMarketSnapshot(sql, users.bob)).toEqual({
+      bestEurOffer: 660_000, eurAvailableCents: 50_000, bestXofOffer: 650_000, xofAvailable: 300_000,
     });
   });
 
@@ -578,7 +607,7 @@ describe("concurrence", () => {
       return {
         userId: owners[Math.floor(random() * owners.length)],
         side,
-        amount: side === "SELL_EUR" ? 1_000 + Math.floor(random() * 70_000) : 10_000 + Math.floor(random() * 480_000),
+        amount: side === "SELL_EUR" ? 1_000 + Math.floor(random() * 15_000) : 10_000 + Math.floor(random() * 100_000),
         limitRate: 645_000 + Math.floor(random() * 20_000),
       };
     });
@@ -586,7 +615,7 @@ describe("concurrence", () => {
     const outcomes = await Promise.allSettled(inputs.map((input) => placeOrderForUser(sql, input)));
     // Seuls des refus de limite d'activité sont admis ; tout autre échec est un bug.
     for (const o of outcomes) {
-      if (o.status === "rejected") expect(String(o.reason)).toMatch(/demandes en attente|par heure/);
+      if (o.status === "rejected") expect(String(o.reason)).toMatch(/demandes en attente|par heure|plafond/);
     }
     const accepted = outcomes.filter((o) => o.status === "fulfilled").length;
 

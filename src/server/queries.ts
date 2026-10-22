@@ -17,10 +17,12 @@ export interface MarketSnapshot {
   xofAvailable: number;
 }
 
-export async function getMarketSnapshot(sql: Sql): Promise<MarketSnapshot> {
+/** Résumé des offres ouvertes ; `excludeUserId` retire celles de l'utilisateur, avec qui il ne peut pas échanger. */
+export async function getMarketSnapshot(sql: Sql, excludeUserId?: string): Promise<MarketSnapshot> {
   const rows = await sql<{ side: Side; best_low: number; best_high: number; total: number }[]>`
     select side, min(limit_rate) as best_low, max(limit_rate) as best_high, sum(remaining)::bigint as total
-    from public.orders where status = 'open'
+    from public.orders
+    where status = 'open' ${excludeUserId ? sql`and owner_id <> ${excludeUserId}` : sql``}
     group by side
   `;
   const eur = rows.find((r) => r.side === "SELL_EUR");

@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { placeOrderAction, type ExchangeState } from "@/app/app/echanger/actions";
 import { averageRate, fmtEur, fmtEurNumber, fmtRate, fmtXof, fmtXofNumber } from "@/lib/format";
 import { eurCentsForXof, parseEurCents, parseRate, parseXof, REFERENCE_RATE, xofForEurCents, type Side } from "@/lib/matching";
-import { checkOrderPolicy } from "@/lib/policy";
+import { checkOrderPolicy, checkVolumePolicy, MAX_MONTHLY_XOF, MAX_ORDER_XOF, remainingAllowance, type VolumeUsage } from "@/lib/policy";
 import { previewOrder, type PublicBookEntry } from "@/lib/preview";
 import { quote } from "@/lib/quote";
 
@@ -21,6 +21,8 @@ interface Props {
   mode: "public" | "app";
   /** Mode app : l'utilisateur peut-il être payé dans la devise qu'il recevrait ? */
   canReceive?: Record<Side, boolean>;
+  /** Mode app : volume déjà engagé aujourd'hui et ce mois-ci, pour appliquer les plafonds. */
+  usage?: VolumeUsage;
 }
 
 type Estimate =
@@ -37,13 +39,20 @@ type Estimate =
       custom: boolean;
     };
 
-function estimate(book: PublicBookEntry[], side: Side, amountInput: string, customRate: string): Estimate {
+function estimate(book: PublicBookEntry[], side: Side, amountInput: string, customRate: string, usage?: VolumeUsage): Estimate {
   if (amountInput.trim() === "") return { kind: "empty" };
   let amount: number;
   try {
     amount = side === "SELL_XOF" ? parseXof(amountInput) : parseEurCents(amountInput);
   } catch (e) {
     return { kind: "error", message: e instanceof Error ? e.message : "Montant invalide." };
+  }
+  // Plafond par échange d'abord (message le plus parlant), puis plafonds du jour et du mois.
+  const overSingle = checkOrderPolicy(side, amount, REFERENCE_RATE);
+  if (overSingle) return { kind: "error", message: overSingle };
+  if (usage) {
+    const overVolume = checkVolumePolicy(side, amount, usage);
+    if (overVolume) return { kind: "error", message: overVolume };
   }
   try {
     if (customRate.trim() !== "") {
@@ -72,14 +81,14 @@ function estimate(book: PublicBookEntry[], side: Side, amountInput: string, cust
   }
 }
 
-export function Converter({ book, mode, canReceive }: Props) {
+export function Converter({ book, mode, canReceive, usage }: Props) {
   const [state, action, pending] = useActionState<ExchangeState, FormData>(placeOrderAction, {});
   const [side, setSide] = useState<Side>("SELL_EUR");
   const [amounts, setAmounts] = useState<Record<Side, string>>({ SELL_EUR: "500", SELL_XOF: "300 000" });
   const [customRate, setCustomRate] = useState("");
   const sendEur = side === "SELL_EUR";
   const amountInput = amounts[side];
-  const est = estimate(book, side, amountInput, customRate);
+  const est = estimate(book, side, amountInput, customRate, usage);
   const money = (receiving: boolean, n: number) => ((sendEur ? !receiving : receiving) ? fmtEur(n) : fmtXof(n));
   const missingDetails = mode === "app" && canReceive !== undefined && !canReceive[side];
 
@@ -151,6 +160,12 @@ export function Converter({ book, mode, canReceive }: Props) {
           </div>
         </div>
       )}
+
+      <p className="limits-line">
+        {usage
+          ? `Vous pouvez encore échanger ${remainingAllowance(usage).toLocaleString("fr-FR")} XOF aujourd'hui (ou l'équivalent en euros).`
+          : `Jusqu'à ${MAX_ORDER_XOF.toLocaleString("fr-FR")} XOF par échange et par jour, ${MAX_MONTHLY_XOF.toLocaleString("fr-FR")} XOF par mois.`}
+      </p>
 
       {mode === "public" ? (
         <Link href="/inscription" className="btn btn-primary btn-lg btn-block">Créer un compte pour échanger</Link>

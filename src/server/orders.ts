@@ -1,7 +1,7 @@
-import { assertValidOrder, placeOrder, type Order, type PlaceOrderResult, type Side } from "../lib/matching";
+import { assertValidOrder, placeOrder, REFERENCE_RATE, type Order, type PlaceOrderResult, type Side } from "../lib/matching";
 import { payToFor, receivedCurrency, type PayTo } from "../lib/payment";
-import { checkActivityPolicy, checkOrderPolicy } from "../lib/policy";
-import type { Sql } from "./db";
+import { checkActivityPolicy, checkOrderPolicy, checkVolumePolicy, type VolumeUsage } from "../lib/policy";
+import type { Queryable, Sql } from "./db";
 import { getPaymentDetails, getPaymentDetailsOf } from "./settlements";
 
 /**
@@ -78,6 +78,10 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
     `;
     const tooActive = checkActivityPolicy(activity.open, activity.recent);
     if (tooActive) throw new RangeError(tooActive);
+
+    // Plafonds journalier et mensuel, eux aussi lus sous le verrou.
+    const overVolume = checkVolumePolicy(side, amount, await getVolumeUsage(tx, userId));
+    if (overVolume) throw new RangeError(overVolume);
 
     const [created] = await tx<{ id: string; seq: number }[]>`
       insert into public.orders (owner_id, side, amount, remaining, limit_rate)
@@ -166,6 +170,32 @@ export async function placeOrderForUser(sql: Sql, input: NewOrderInput): Promise
 
     return { orderId: created.id, seq: created.seq, result };
   });
+}
+
+/**
+ * Volume déjà engagé par l'utilisateur aujourd'hui et ce mois-ci, en XOF (jours et mois en
+ * temps universel, l'heure de Dakar et d'Abidjan). Un ordre compte pour son montant, sauf la
+ * part non échangée d'un ordre annulé ; un montant en euros compte au taux officiel.
+ */
+export async function getVolumeUsage(sql: Queryable, userId: string): Promise<VolumeUsage> {
+  const [row] = await sql<{ today: number; month: number }[]>`
+    with engaged as (
+      select created_at,
+             case when status = 'cancelled' then amount - remaining else amount end as amount,
+             side
+      from public.orders
+      where owner_id = ${userId}
+        and created_at >= date_trunc('month', now() at time zone 'UTC') at time zone 'UTC'
+    ), in_xof as (
+      select created_at,
+             case when side = 'SELL_XOF' then amount else (amount * ${REFERENCE_RATE}) / 100000 end as xof
+      from engaged
+    )
+    select coalesce(sum(xof) filter (where created_at >= date_trunc('day', now() at time zone 'UTC') at time zone 'UTC'), 0)::bigint as today,
+           coalesce(sum(xof), 0)::bigint as month
+    from in_xof
+  `;
+  return { today: row.today, month: row.month };
 }
 
 /**

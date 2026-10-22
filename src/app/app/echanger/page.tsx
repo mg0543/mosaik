@@ -4,6 +4,7 @@ import { StepIcon } from "@/components/illustrations";
 import { payToFor } from "@/lib/payment";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
+import { getVolumeUsage } from "@/server/orders";
 import { getBookForUser } from "@/server/queries";
 import { getPaymentDetails } from "@/server/settlements";
 
@@ -12,7 +13,11 @@ export const metadata: Metadata = { title: "Échanger" };
 export default async function ExchangePage() {
   const user = await requireUser();
   const sql = getSql();
-  const [book, details] = await Promise.all([getBookForUser(sql, user.id), getPaymentDetails(sql, user.id)]);
+  const [book, details, usage] = await Promise.all([
+    getBookForUser(sql, user.id),
+    getPaymentDetails(sql, user.id),
+    getVolumeUsage(sql, user.id),
+  ]);
   // Pour échanger, il faut pouvoir être payé dans la devise reçue.
   const canReceive = { SELL_XOF: payToFor(details, "EUR") !== null, SELL_EUR: payToFor(details, "XOF") !== null };
 
@@ -21,7 +26,7 @@ export default async function ExchangePage() {
       <h1 className="app-title">Échanger</h1>
       <section className="card converter-card">
         <div className="card-body">
-          <Converter book={book} mode="app" canReceive={canReceive} />
+          <Converter book={book} mode="app" canReceive={canReceive} usage={usage} />
         </div>
       </section>
       <section className="card">

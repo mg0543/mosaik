@@ -12,8 +12,10 @@ Moteur de matching de liquidité multi-devises EUR ↔ XOF.
 
 - `src/lib/` : code pur et testé, partagé entre navigateur et serveur.
   - `matching.ts` : moteur du carnet d'ordres (calcul exact en entiers) ;
-  - `policy.ts` : garde-fous du pilote (taux à ±15 % de la référence, 500 000 XOF max par ordre,
-    10 ordres ouverts, 30 ordres par heure) ;
+  - `policy.ts` : garde-fous (taux à ±15 % de la référence ; 2 000 000 XOF par échange et par jour,
+    10 000 000 XOF par mois, alignés sur les limites BCEAO de la monnaie électronique ; 10 demandes
+    ouvertes, 30 échanges par heure) ;
+  - `quote.ts` : devis du convertisseur (taux choisi automatiquement) ;
   - `payment.ts`, `settlement.ts` : coordonnées de réception (IBAN, mobile money) et protocole de règlement ;
   - `preview.ts`, `format.ts`, `order-status.ts` : aperçu, affichage, statuts.
 - `src/server/` : accès à la base et authentification, côté serveur uniquement.
