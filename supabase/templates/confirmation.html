@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="fr">
+  <body style="margin:0;padding:24px;background:#f4f3ef;font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#16181a">
+    <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;border:1px solid #e4e2db">
+      <tr>
+        <td style="padding:28px">
+          <p style="margin:0 0 4px;font-weight:600;font-size:18px">Mosaik</p>
+          <p style="margin:0 0 24px;color:#55585c">Bienvenue ! Confirmez votre adresse e-mail pour activer votre compte.</p>
+          <p style="margin:0 0 24px">
+            <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email"
+               style="display:inline-block;background:#00856a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 18px;border-radius:8px">
+              Confirmer mon adresse
+            </a>
+          </p>
+          <p style="margin:0;color:#85888c;font-size:12px">
+            Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail : aucun compte ne sera activé.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

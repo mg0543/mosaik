@@ -860,3 +860,61 @@ mark.todo {
 .card-body > .facts:first-child {
   margin-top: 0;
 }
+
+/* ---------- Connexion et inscription ---------- */
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 4px;
+}
+
+@media (max-width: 920px) {
+  .header-actions {
+    margin-left: auto;
+  }
+}
+
+.auth-tabs {
+  margin-bottom: 18px;
+}
+
+.auth-tabs a {
+  border-radius: 7px;
+  padding: 9px 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.auth-tabs a[aria-current="page"] {
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 1px var(--border-strong), 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+.auth-card {
+  max-width: 460px;
+}
+
+.reveal {
+  border: 0;
+  background: none;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 12px;
+  cursor: pointer;
+  align-self: stretch;
+}
+
+.optional {
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.link-small {
+  font-size: 13px;
+}

@@ -6,6 +6,7 @@ import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
 import { LocalDate } from "@/components/local-date";
 import { getMarketSnapshot, getMyOrders } from "@/server/queries";
+import { getProfile } from "@/server/profiles";
 import { getPendingActions } from "@/server/settlements";
 
 export const metadata: Metadata = { title: "Accueil" };
@@ -13,17 +14,18 @@ export const metadata: Metadata = { title: "Accueil" };
 export default async function DashboardPage() {
   const user = await requireUser();
   const sql = getSql();
-  const [market, orders, toDo] = await Promise.all([
+  const [market, orders, toDo, profile] = await Promise.all([
     getMarketSnapshot(sql),
     getMyOrders(sql, user.id, 20),
     getPendingActions(sql, user.id),
+    getProfile(sql, user.id),
   ]);
   const open = orders.filter((o) => o.status === "open");
   const recent = orders.slice(0, 5);
 
   return (
     <div className="app-page">
-      <h1 className="app-title">Bonjour</h1>
+      <h1 className="app-title">Bonjour{profile.firstName ? ` ${profile.firstName}` : ""}</h1>
       <p className="muted app-subtitle">{user.email}</p>
 
       {toDo.length > 0 && (

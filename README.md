@@ -96,9 +96,18 @@ Pour ouvrir le pilote :
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `DATABASE_URL` (pooler Supabase, mode transaction, port 6543)
    et `NEXT_PUBLIC_SITE_URL`. Redéployer.
 
+## Comptes
+
+- Inscription (`/inscription`) : prénom, nom, e-mail, téléphone facultatif (format international) et
+  mot de passe choisi (10 caractères minimum, avec lettres et chiffres).
+- Connexion (`/connexion`) : e-mail et mot de passe. « Mot de passe oublié » envoie un code à 6 chiffres.
+- Le profil (prénom, nom, téléphone) est créé par la base en même temps que le compte (table
+  `profiles`) et n'est modifiable que par le serveur.
+
 ## Inviter un participant au pilote
 
-Le pilote est sur invitation : seules les adresses invitées peuvent recevoir un code de connexion.
+Le pilote est sur invitation : seules les adresses invitées peuvent créer un compte
+(`MOSAIK_INVITE_ONLY=false` ouvre l'inscription à tous).
 Dans Supabase > SQL Editor :
 
 ```sql

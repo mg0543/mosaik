@@ -29,7 +29,7 @@ export default async function HomePage() {
           inverse, et vous n&apos;obtenez jamais moins bien que le taux que vous avez choisi.
         </p>
         <div className="cta-row">
-          <Link href="/connexion" className="btn btn-primary btn-lg">Rejoindre le pilote</Link>
+          <Link href="/inscription" className="btn btn-primary btn-lg">Créer un compte</Link>
           <Link href="/simulateur" className="btn btn-secondary btn-lg">Essayer le simulateur</Link>
         </div>
       </section>

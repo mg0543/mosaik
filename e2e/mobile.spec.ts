@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { loginWithCode, testEmail } from "./helpers";
+import { signUp } from "./helpers";
 
 test("sur mobile, la barre d'onglets remplace la navigation et rien ne déborde", async ({ page }) => {
-  await loginWithCode(page, testEmail("mobile"));
+  await signUp(page, "mobile");
 
   const tabbar = page.getByRole("navigation", { name: "Navigation principale" }).last();
   await expect(tabbar).toBeVisible();
@@ -10,7 +10,7 @@ test("sur mobile, la barre d'onglets remplace la navigation et rien ne déborde"
   await expect(page).toHaveURL(/\/app\/echanger$/);
   await expect(tabbar.getByRole("link", { name: "Échanger" })).toHaveAttribute("aria-current", "page");
 
-  for (const path of ["/", "/connexion", "/app", "/app/echanger", "/app/ordres", "/app/compte", "/simulateur"]) {
+  for (const path of ["/", "/connexion", "/inscription", "/app", "/app/echanger", "/app/ordres", "/app/compte", "/simulateur"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, `débordement horizontal sur ${path}`).toBeLessThanOrEqual(0);

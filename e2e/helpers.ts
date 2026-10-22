@@ -23,7 +23,7 @@ export async function invite(email: string): Promise<void> {
 }
 
 /** Dernier e-mail reçu par cette adresse dans la boîte de test locale (Mailpit). */
-async function latestEmail(email: string): Promise<{ text: string; html: string }> {
+export async function latestEmail(email: string): Promise<{ text: string; html: string }> {
   for (let attempt = 0; attempt < 40; attempt++) {
     const search = await (await fetch(`${MAILPIT}/search?query=${encodeURIComponent(`to:"${email}"`)}`)).json();
     const id = search.messages?.[0]?.ID;
@@ -43,29 +43,38 @@ export async function codeFromEmail(email: string): Promise<string> {
   return code;
 }
 
-export async function linkFromEmail(email: string): Promise<string> {
-  const { html } = await latestEmail(email);
-  const href = /href="([^"]*\/auth\/confirm[^"]*)"/.exec(html)?.[1];
-  if (!href) throw new Error("Lien de connexion introuvable dans l'e-mail");
-  // Seuls le chemin et le jeton comptent : on vise le serveur de test, quel que soit son port.
-  const url = new URL(href.replace(/&amp;/g, "&"));
-  return `${url.pathname}${url.search}`;
+/** Mot de passe des comptes de test (respecte les règles : 10 caractères, lettres et chiffres). */
+export const TEST_PASSWORD = "mosaik2026test";
+
+export interface TestAccount {
+  email: string;
+  password: string;
+  firstName: string;
 }
 
-/** Demande un code et l'envoie, comme un utilisateur invité. */
-export async function requestCode(page: Page, email: string): Promise<void> {
-  await invite(email);
+/** Crée un compte depuis l'écran d'inscription, comme un utilisateur invité, et arrive sur l'accueil. */
+export async function signUp(page: Page, name: string, options: { phone?: string } = {}): Promise<TestAccount> {
+  const account = { email: testEmail(name), password: TEST_PASSWORD, firstName: name.charAt(0).toUpperCase() + name.slice(1) };
+  await invite(account.email);
+  await page.goto("/inscription");
+  await page.getByLabel("Prénom").fill(account.firstName.replace(/[^\p{L}]/gu, "") || "Test");
+  await page.getByLabel("Nom", { exact: true }).fill("Test");
+  await page.getByLabel("Adresse e-mail").fill(account.email);
+  if (options.phone) await page.getByLabel(/Téléphone/).fill(options.phone);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(account.password);
+  await page.getByLabel("Confirmer le mot de passe", { exact: true }).fill(account.password);
+  await page.getByRole("checkbox", { name: /J'accepte les conditions/ }).check();
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  return account;
+}
+
+/** Se connecte avec e-mail et mot de passe. */
+export async function logIn(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/connexion");
   await page.getByLabel("Adresse e-mail").fill(email);
-  await page.getByRole("button", { name: "Recevoir un code" }).click();
-  await expect(page.getByLabel("Code reçu par e-mail")).toBeVisible();
-}
-
-export async function loginWithCode(page: Page, email: string): Promise<void> {
-  await requestCode(page, email);
-  await page.getByLabel("Code reçu par e-mail").fill(await codeFromEmail(email));
+  await page.getByLabel("Mot de passe", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page).toHaveURL(/\/app$/);
 }
 
 /** Renseigne les coordonnées de réception depuis l'écran Compte. */

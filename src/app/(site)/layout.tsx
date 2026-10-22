@@ -19,9 +19,14 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
           <div className="ref-rate">
             Référence <strong className="num">1 € = {fmtRate(REFERENCE_RATE)} XOF</strong>
           </div>
-          <Link href={user ? "/app" : "/connexion"} className="btn btn-primary btn-sm">
-            {user ? "Mon espace" : "Se connecter"}
-          </Link>
+          {user ? (
+            <Link href="/app" className="btn btn-primary btn-sm">Mon espace</Link>
+          ) : (
+            <div className="header-actions">
+              <Link href="/connexion" className="btn btn-secondary btn-sm">Se connecter</Link>
+              <Link href="/inscription" className="btn btn-primary btn-sm">S&apos;inscrire</Link>
+            </div>
+          )}
         </div>
       </header>
       <main className="page">{children}</main>
@@ -31,7 +36,7 @@ export default async function SiteLayout({ children }: { children: ReactNode }) 
           appariements ; elle ne détient, ne transfère ni ne convertit aucun fonds.
         </p>
         <p>
-          <Link href="/simulateur">Simulateur</Link> · <Link href="/conditions">Conditions du pilote</Link> ·{" "}
+          <Link href="/simulateur">Simulateur</Link> · <Link href="/inscription">Inscription</Link> · <Link href="/conditions">Conditions du pilote</Link> ·{" "}
           <Link href="/confidentialite">Confidentialité</Link>
         </p>
       </footer>

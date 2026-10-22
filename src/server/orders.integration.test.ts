@@ -5,6 +5,7 @@ import { createSql } from "./db";
 import { cancelOrderForUser, placeOrderForUser } from "./orders";
 import { getBookForUser, getMarketSnapshot, getMyOrder, getMyOrders } from "./queries";
 import { canSignIn, inviteToPilot } from "./invites";
+import { getProfile } from "./profiles";
 import { confirmSettlementStep, getPendingActions, openDispute, saveEurDetails, saveXofDetails } from "./settlements";
 
 // Base Supabase locale (`supabase start`) par défaut. Utilisateurs fictifs, adresses en .test.
@@ -341,6 +342,49 @@ describe("règlement entre participants", () => {
     await expect(sql`update public.settlements set taker_sent_at = null`).rejects.toThrow(/ne peut pas être annulée/);
     await expect(sql`delete from public.settlements`).rejects.toThrow(/supprimé/);
     await expect(sql`update public.settlements set maker_sent_at = now()`).rejects.toThrow(/settlements_sequence/);
+  });
+});
+
+describe("profils", () => {
+  it("crée le profil avec le compte, à partir des informations d'inscription", async () => {
+    const id = randomUUID();
+    const meta = { first_name: " Aïssatou ", last_name: "N'Diaye", phone: "+221771234567" };
+    try {
+      await sql`
+        insert into auth.users (id, email, aud, role, raw_user_meta_data)
+        values (${id}, ${`profil-${id.slice(0, 8)}@exemple.test`}, 'authenticated', 'authenticated', ${sql.json(meta)})
+      `;
+      expect(await getProfile(sql, id)).toEqual({ firstName: "Aïssatou", lastName: "N'Diaye", phone: "+221771234567" });
+    } finally {
+      await sql`delete from auth.users where id = ${id}`;
+    }
+    // Le profil disparaît avec le compte.
+    expect(await getProfile(sql, id)).toEqual({ firstName: null, lastName: null, phone: null });
+  });
+
+  it("refuse tout le compte si les informations sont invalides", async () => {
+    const id = randomUUID();
+    await expect(sql`
+      insert into auth.users (id, email, aud, role, raw_user_meta_data)
+      values (${id}, ${`profil-${id.slice(0, 8)}@exemple.test`}, 'authenticated', 'authenticated',
+              ${sql.json({ first_name: "Awa", last_name: "Diop", phone: "0612345678" })})
+    `).rejects.toThrow(/profiles_phone_check/);
+    const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from auth.users where id = ${id}`;
+    expect(n).toBe(0);
+  });
+
+  it("ne laisse lire que son propre profil, sans aucune écriture côté client", async () => {
+    const asUser = (userId: string, query: (tx: typeof sql) => Promise<unknown>) =>
+      sql.begin(async (tx) => {
+        await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: "authenticated" })}, true)`;
+        await tx`set local role authenticated`;
+        return query(tx as unknown as typeof sql);
+      });
+    const rows = (await asUser(users.alice, (tx) => tx`select user_id from public.profiles`)) as { user_id: string }[];
+    expect(rows.map((r) => r.user_id)).toEqual([users.alice]);
+    await expect(asUser(users.alice, (tx) => tx`update public.profiles set first_name = 'Pirate'`)).rejects.toThrow(
+      /permission denied/,
+    );
   });
 });
 

@@ -18,7 +18,11 @@ export default function PrivacyPage() {
 
       <h2>Quelles données nous traitons</h2>
       <ul>
-        <li><strong>Votre adresse e-mail</strong>, pour créer votre compte et vous envoyer vos codes de connexion.</li>
+        <li>
+          <strong>Votre identité de compte</strong> : prénom, nom, adresse e-mail et, si vous le donnez, votre
+          numéro de téléphone. Votre mot de passe n&apos;est jamais stocké en clair : seule une empreinte
+          chiffrée est conservée.
+        </li>
         <li><strong>Vos ordres et vos échanges</strong> : sens, montants, taux, dates et statuts.</li>
         <li>
           <strong>Vos coordonnées de réception</strong> : IBAN et nom du titulaire pour recevoir des euros ;
@@ -57,7 +61,7 @@ export default function PrivacyPage() {
 
       <h2>Ce que voient les autres participants</h2>
       <p>
-        Personne ne voit votre adresse e-mail. Les autres participants voient seulement le carnet
+        Personne ne voit votre adresse e-mail ni votre téléphone. Les autres participants voient seulement le carnet
         d&apos;ordres anonyme : sens, montant restant et taux de chaque ordre en attente.
       </p>
       <p>

@@ -4,6 +4,7 @@ import { signOutAction } from "@/app/(site)/connexion/actions";
 import { MAX_OPEN_ORDERS, MAX_ORDER_XOF, RATE_BAND_PCT } from "@/lib/policy";
 import { requireUser } from "@/server/auth";
 import { getSql } from "@/server/db";
+import { getProfile } from "@/server/profiles";
 import { getPaymentDetails } from "@/server/settlements";
 import { PaymentForms } from "./payment-forms";
 
@@ -11,7 +12,9 @@ export const metadata: Metadata = { title: "Compte" };
 
 export default async function AccountPage() {
   const user = await requireUser();
-  const details = await getPaymentDetails(getSql(), user.id);
+  const sql = getSql();
+  const [details, profile] = await Promise.all([getPaymentDetails(sql, user.id), getProfile(sql, user.id)]);
+  const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(" ");
 
   return (
     <div className="app-page">
@@ -20,8 +23,10 @@ export default async function AccountPage() {
       <section className="card">
         <div className="card-body">
           <dl className="facts">
+            {fullName && <div><dt>Nom</dt><dd>{fullName}</dd></div>}
             <div><dt>Adresse e-mail</dt><dd>{user.email}</dd></div>
-            <div><dt>Visible par les autres participants</dt><dd>Jamais</dd></div>
+            <div><dt>Téléphone</dt><dd>{profile.phone ?? "Non renseigné"}</dd></div>
+            <div><dt>E-mail et téléphone visibles par les autres</dt><dd>Jamais</dd></div>
           </dl>
         </div>
       </section>
