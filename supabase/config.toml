@@ -414,3 +414,21 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------------------
+# Production (projet cloud « mosaik ») : seules ces valeurs diffèrent du local.
+# ---------------------------------------------------------------------------
+[remotes.production]
+project_id = "yksscigqkfswgcftjllh"
+
+[remotes.production.auth]
+site_url = "https://mosaik-ten.vercel.app"
+additional_redirect_urls = ["https://mosaik-ten.vercel.app/auth/confirm"]
+
+[remotes.production.auth.rate_limit]
+# Limite imposée par l'envoi d'e-mails intégré à Supabase, tant qu'aucun SMTP n'est configuré.
+email_sent = 2
+
+[remotes.production.auth.email]
+# Provisoire : sans service d'e-mail, les confirmations ne partiraient pas. À réactiver avec le SMTP.
+enable_confirmations = false
